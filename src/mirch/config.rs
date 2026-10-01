@@ -108,7 +108,13 @@ impl PhysConfig {
     }
 
     pub fn new_with_toml(toml: &KMiriConfigToml) -> Self {
-        Self { total_mem_size: toml.total_mem_size() as usize, ..Self::default() }
+        let mut config = Self { total_mem_size: toml.total_mem_size() as usize, ..Self::default() };
+        if !toml.page_table_enabled() {
+            // Allocation lookup uses physical addresses without page tables. Give
+            // interpreter-created Rust allocations matching identity addresses too.
+            config.kernel_code_base_vaddr = 0;
+        }
+        config
     }
 }
 
