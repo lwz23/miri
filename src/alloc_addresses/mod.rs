@@ -364,7 +364,9 @@ pub trait EvalContextExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
     /// If the `paddr` is not referred to a typed slot, it returns `None`.
     fn lazy_alloc_typed_slot_allocation(&self, paddr: usize) -> Option<AllocId> {
         let page_index = paddr / mirch::page_size();
-        let page_info = mirch::physical_mem().page_states[page_index];
+        let Some(page_info) = mirch::physical_mem().page_states.get(page_index).copied() else {
+            return None;
+        };
 
         if let PageState::Typed { page_type: _, slot_size } = page_info {
             return Some(self.kernel_allocation_at(paddr, slot_size, slot_size));
@@ -410,13 +412,12 @@ pub trait EvalContextExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
 
         // Re-expose the root tag so wildcard/raw-pointer accesses can find a
         // writable provenance after the typed-slot allocation is created.
-        let root_tag = {
-            let mut borrow_tracker = ecx.machine.borrow_tracker.as_ref().unwrap().borrow_mut();
-            borrow_tracker.root_ptr_tag(alloc_id, &ecx.machine)
-        };
-        ecx.expose_tag(alloc_id, root_tag).discard_err().unwrap_or_else(|| {
-            panic!("paddr={paddr:#x} ({alloc_id:?}) with {root_tag:?} has been exposed")
-        });
+        if let Some(borrow_tracker) = ecx.machine.borrow_tracker.as_ref() {
+            let root_tag = borrow_tracker.borrow_mut().root_ptr_tag(alloc_id, &ecx.machine);
+            ecx.expose_tag(alloc_id, root_tag).discard_err().unwrap_or_else(|| {
+                panic!("paddr={paddr:#x} ({alloc_id:?}) with {root_tag:?} has been exposed")
+            });
+        }
         alloc_id
     }
 

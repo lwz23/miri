@@ -608,6 +608,24 @@ trait EvalContextExtPriv<'tcx>: crate::MiriInterpCxExt<'tcx> {
             }
 
             // Standard C allocation
+            "rust_helper_krealloc_node_align" | "krealloc_node_align" => {
+                let [old_ptr, new_size, _align, _flags, _nid] =
+                    this.check_shim_sig_lenient(abi, CanonAbi::C, link_name, args)?;
+                let old_ptr = this.read_pointer(old_ptr)?;
+                let new_size = this.read_target_usize(new_size)?;
+                if new_size == 0 {
+                    if !this.ptr_is_null(old_ptr)? {
+                        this.free(old_ptr)?;
+                    }
+                    this.write_null(dest)?;
+                } else if this.ptr_is_null(old_ptr)? {
+                    let res = this.malloc(new_size, AllocInit::Uninit)?;
+                    this.write_pointer(res, dest)?;
+                } else {
+                    let res = this.realloc(old_ptr, new_size)?;
+                    this.write_pointer(res, dest)?;
+                }
+            }
             "malloc" => {
                 let [size] = this.check_shim_sig_lenient(abi, CanonAbi::C, link_name, args)?;
                 let size = this.read_target_usize(size)?;

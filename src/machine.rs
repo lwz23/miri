@@ -1579,12 +1579,18 @@ impl<'tcx> Machine<'tcx> for MiriMachine<'tcx> {
                         Size::from_bytes(addr),
                     ));
                 }
-                let mut pending = ecx.machine.pending_unsupported_foreign_item.borrow_mut();
-                if pending.is_none() {
-                    *pending = Some(format!(
-                        "can't use unknown foreign function symbol `{link_name}` on OS `{os}`",
-                        os = ecx.tcx.sess.target.os
-                    ));
+                let shimmed = matches!(
+                    link_name.as_str(),
+                    "rust_helper_krealloc_node_align" | "krealloc_node_align"
+                );
+                if !shimmed {
+                    let mut pending = ecx.machine.pending_unsupported_foreign_item.borrow_mut();
+                    if pending.is_none() {
+                        *pending = Some(format!(
+                            "can't use unknown foreign function symbol `{link_name}` on OS `{os}`",
+                            os = ecx.tcx.sess.target.os
+                        ));
+                    }
                 }
             }
         }
