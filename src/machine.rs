@@ -1579,6 +1579,9 @@ impl<'tcx> Machine<'tcx> for MiriMachine<'tcx> {
                         Size::from_bytes(addr),
                     ));
                 }
+                // 函数指针在真正调用前会先到这里。这两个符号已经在
+                // `foreign_items.rs` 里实现。若仍记成未知外部函数，
+                // #1261 的测试会停在 `KVec::resize`，到不了后面的释放和写入。
                 let shimmed = matches!(
                     link_name.as_str(),
                     "rust_helper_krealloc_node_align" | "krealloc_node_align"

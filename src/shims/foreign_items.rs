@@ -608,6 +608,12 @@ trait EvalContextExtPriv<'tcx>: crate::MiriInterpCxExt<'tcx> {
             }
 
             // Standard C allocation
+            // Linux 的 `KVec` 不直接调用这个符号，而是把它放进 `ReallocFunc` 再间接调用。
+            // 这里转到已有的 `malloc` / `realloc` / `free`，只为了让
+            // Rust for Linux #1261 能执行到 `drop` 和之后的写入。
+            // `size == 0` 是释放，必须真的 `free`。不要在这里报 UB：
+            // `krealloc freed non-null buffer` 是实验中途临时插入的诊断，已经删除。
+            // `Formatter` 随后用保存的 `usize` 地址写入，这个分支不会把那次写入报成 UAF。
             "rust_helper_krealloc_node_align" | "krealloc_node_align" => {
                 let [old_ptr, new_size, _align, _flags, _nid] =
                     this.check_shim_sig_lenient(abi, CanonAbi::C, link_name, args)?;

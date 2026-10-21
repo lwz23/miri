@@ -364,6 +364,8 @@ pub trait EvalContextExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
     /// If the `paddr` is not referred to a typed slot, it returns `None`.
     fn lazy_alloc_typed_slot_allocation(&self, paddr: usize) -> Option<AllocId> {
         let page_index = paddr / mirch::page_size();
+        // libc `malloc` 的地址不是 KMiri 内核页，页号会落在 `page_states` 外面。
+        // 原先直接索引会 panic。越界就当作这里没有 typed slot。
         let Some(page_info) = mirch::physical_mem().page_states.get(page_index).copied() else {
             return None;
         };
@@ -412,6 +414,9 @@ pub trait EvalContextExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
 
         // Re-expose the root tag so wildcard/raw-pointer accesses can find a
         // writable provenance after the typed-slot allocation is created.
+        // Linux 入口默认 `-Zmiri-disable-stacked-borrows`，此时 `borrow_tracker` 是 `None`。
+        // 原先的 `unwrap` 会让解释器在释放后的写入里 panic，那不是 UAF 报告。
+        // 没有别名检查时跳过 expose，所以这里也不能检出 #1261。
         if let Some(borrow_tracker) = ecx.machine.borrow_tracker.as_ref() {
             let root_tag = borrow_tracker.borrow_mut().root_ptr_tag(alloc_id, &ecx.machine);
             ecx.expose_tag(alloc_id, root_tag).discard_err().unwrap_or_else(|| {
