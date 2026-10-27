@@ -394,7 +394,9 @@ pub trait EvalContextExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
                 );
             }
             if hit.is_some() && pr64_tombstone() {
-                eprintln!("[PR64] TOMBSTONE: refuse to materialize a new allocation over freed range");
+                eprintln!(
+                    "[PR64] TOMBSTONE: refuse to materialize a new allocation over freed range"
+                );
                 return None;
             }
             let id = self.kernel_allocation_at(paddr, slot_size, slot_size);
