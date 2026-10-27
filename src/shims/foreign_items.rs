@@ -619,6 +619,9 @@ trait EvalContextExtPriv<'tcx>: crate::MiriInterpCxExt<'tcx> {
                     this.check_shim_sig_lenient(abi, CanonAbi::C, link_name, args)?;
                 let old_ptr = this.read_pointer(old_ptr)?;
                 let new_size = this.read_target_usize(new_size)?;
+                if std::env::var_os("PR64_LOG").is_some() {
+                    eprintln!("[PR64] krealloc shim old={old_ptr:?} new_size={new_size}");
+                }
                 if new_size == 0 {
                     if !this.ptr_is_null(old_ptr)? {
                         this.free(old_ptr)?;
@@ -626,6 +629,9 @@ trait EvalContextExtPriv<'tcx>: crate::MiriInterpCxExt<'tcx> {
                     this.write_null(dest)?;
                 } else if this.ptr_is_null(old_ptr)? {
                     let res = this.malloc(new_size, AllocInit::Uninit)?;
+                    if std::env::var_os("PR64_LOG").is_some() {
+                        eprintln!("[PR64]   malloc -> {res:?}");
+                    }
                     this.write_pointer(res, dest)?;
                 } else {
                     let res = this.realloc(old_ptr, new_size)?;

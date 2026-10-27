@@ -357,6 +357,21 @@ fn dummy_alloc(params: MiriAllocParams) -> *const u8 {
     ptr
 }
 
+// ---- PR64 experiment only ----
+static PR64_FREED: std::sync::Mutex<std::collections::BTreeMap<u64, u64>> =
+    std::sync::Mutex::new(std::collections::BTreeMap::new());
+fn pr64_log() -> bool {
+    std::env::var_os("PR64_LOG").is_some()
+}
+fn pr64_tombstone() -> bool {
+    std::env::var_os("PR64_TOMBSTONE").is_some()
+}
+fn pr64_freed_hit(paddr: u64) -> Option<(u64, u64)> {
+    let map = PR64_FREED.lock().unwrap();
+    map.range(..=paddr).next_back().filter(|(_, end)| paddr < **end).map(|(s, e)| (*s, *e))
+}
+// ---- end PR64 ----
+
 impl<'tcx> EvalContextExt<'tcx> for crate::MiriInterpCx<'tcx> {}
 pub trait EvalContextExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
     /// Allocates a new allocation at the given address for typed slot.
@@ -371,7 +386,22 @@ pub trait EvalContextExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
         };
 
         if let PageState::Typed { page_type: _, slot_size } = page_info {
-            return Some(self.kernel_allocation_at(paddr, slot_size, slot_size));
+            let hit = pr64_freed_hit(paddr as u64);
+            if pr64_log() {
+                eprintln!(
+                    "[PR64] lazy_alloc_typed_slot_allocation paddr={paddr:#x} page_base={:#x} slot_size={slot_size:#x} freed_hit={hit:x?}",
+                    paddr - paddr % slot_size
+                );
+            }
+            if hit.is_some() && pr64_tombstone() {
+                eprintln!("[PR64] TOMBSTONE: refuse to materialize a new allocation over freed range");
+                return None;
+            }
+            let id = self.kernel_allocation_at(paddr, slot_size, slot_size);
+            if pr64_log() {
+                eprintln!("[PR64]   -> new kernel allocation {id:?}");
+            }
+            return Some(id);
         }
 
         None
@@ -886,6 +916,18 @@ impl<'tcx> MiriMachine<'tcx> {
         // To avoid a linear scan we first look up the address in `base_addr`, and then find it in
         // `int_to_ptr_map`.
         let paddr = *global_state.base_paddr.get(&dead_id).unwrap();
+        if matches!(
+            kind,
+            MemoryKind::Machine(MiriMemoryKind::C) | MemoryKind::Machine(MiriMemoryKind::Rust)
+        ) {
+            PR64_FREED.lock().unwrap().insert(paddr, paddr + size.bytes());
+            if pr64_log() {
+                eprintln!(
+                    "[PR64] free_alloc_id {dead_id:?} kind={kind:?} paddr=[{paddr:#x}, {:#x})",
+                    paddr + size.bytes()
+                );
+            }
+        }
         let Ok(pos) = global_state.int_to_ptr_map.binary_search_by_key(&paddr, |(addr, _)| *addr)
         else {
             panic!("paddr={paddr:#x} is not in int_to_ptr_map");
