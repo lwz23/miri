@@ -143,7 +143,7 @@ pub struct FrameExtra<'tcx> {
     pub catch_unwind: Option<CatchUnwindData<'tcx>>,
 
     /// Marks the IRQ entry itself, so helpers returning do not finish the interrupt.
-    pub irq: Option<IrqFrame>,
+    pub(crate) irq: Option<IrqFrame>,
 
     /// If `measureme` profiling is enabled, holds timing information
     /// for the start of this frame. When we finish executing this frame,
@@ -510,6 +510,12 @@ pub(crate) struct PendingIrq {
     pub(crate) source: IrqSource,
 }
 
+/// Whether this raise created a pending event or latched into an existing one.
+pub(crate) enum IrqQueueOutcome {
+    Queued { event_id: u64 },
+    Merged { into_event: u64 },
+}
+
 /// Identity and return state owned by the IRQ entry frame.
 #[derive(Debug)]
 pub(crate) struct IrqFrame {
@@ -768,14 +774,23 @@ pub struct MiriMachine<'tcx> {
 }
 
 impl<'tcx> MiriMachine<'tcx> {
-    pub(crate) fn queue_irq(&mut self, cpu: usize, vector: u8, source: IrqSource) -> u64 {
+    pub(crate) fn queue_irq(
+        &mut self,
+        cpu: usize,
+        vector: u8,
+        source: IrqSource,
+    ) -> IrqQueueOutcome {
+        // Only pending vectors are latched; an active vector may be queued again.
+        if let Some(pending) = self.irq_cpus[cpu].pending.iter().find(|irq| irq.vector == vector) {
+            return IrqQueueOutcome::Merged { into_event: pending.event_id };
+        }
         let event_id = self.next_irq_event_id;
         self.next_irq_event_id = self.next_irq_event_id.wrapping_add(1);
         self.irq_cpus[cpu].pending.push_back(PendingIrq { vector, event_id, source });
-        event_id
+        IrqQueueOutcome::Queued { event_id }
     }
 
-    pub(crate) fn maybe_queue_timer_irq(&mut self, cpu: usize) -> Option<u64> {
+    pub(crate) fn maybe_queue_timer_irq(&mut self, cpu: usize) -> Option<IrqQueueOutcome> {
         if !self.irq_config.enabled() || self.irq_cpus[cpu].active.is_some() {
             return None;
         }
@@ -2134,16 +2149,27 @@ impl<'tcx> Machine<'tcx> for MiriMachine<'tcx> {
 
         // Timer IRQs are queued here, but scheduler.rs delivers them only after
         // the current MIR terminator has completed.
-        if let Some(event_id) = ecx.machine.maybe_queue_timer_irq(ecx.machine.threads.active_cpu) {
+        if let Some(outcome) = ecx.machine.maybe_queue_timer_irq(ecx.machine.threads.active_cpu) {
             if ecx.machine.irq_config.trace() {
-                eprintln!(
-                    "KMiri IRQ: event={event_id} cpu={} action=timer-queued vector={} source=Timer block={} IF={} pending={}",
-                    ecx.machine.threads.active_cpu,
-                    ecx.machine.timer_vector.unwrap(),
-                    ecx.machine.basic_block_count,
-                    ecx.machine.irq_cpus[ecx.machine.threads.active_cpu].enabled,
-                    ecx.machine.irq_cpus[ecx.machine.threads.active_cpu].pending.len(),
-                );
+                match outcome {
+                    IrqQueueOutcome::Queued { event_id } => eprintln!(
+                        "KMiri IRQ: event={event_id} cpu={} action=timer-queued vector={} source=Timer block={} IF={} pending={}",
+                        ecx.machine.threads.active_cpu,
+                        ecx.machine.timer_vector.unwrap(),
+                        ecx.machine.basic_block_count,
+                        ecx.machine.irq_cpus[ecx.machine.threads.active_cpu].enabled,
+                        ecx.machine.irq_cpus[ecx.machine.threads.active_cpu].pending.len(),
+                    ),
+                    IrqQueueOutcome::Merged { into_event } => eprintln!(
+                        "KMiri IRQ: cpu={} thread={:?} action=merged vector={} source=Timer into_event={into_event} block_count={} pending={} IF={}",
+                        ecx.machine.threads.active_cpu,
+                        ecx.machine.threads.active_thread(),
+                        ecx.machine.timer_vector.unwrap(),
+                        ecx.machine.basic_block_count,
+                        ecx.machine.irq_cpus[ecx.machine.threads.active_cpu].pending.len(),
+                        ecx.machine.irq_cpus[ecx.machine.threads.active_cpu].enabled,
+                    ),
+                }
             }
         }
 
