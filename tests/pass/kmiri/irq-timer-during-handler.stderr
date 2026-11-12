@@ -1,0 +1,193 @@
+KMiri IRQ: cpu=0 action=entry-registered block_count=369
+KMiri IRQ: cpu=0 action=timer-vector vector=40 block_count=372
+KMiri IRQ: event=0 cpu=0 action=timer-queued vector=40 source=Timer block=384 IF=true pending=1
+KMiri IRQ: event=0 cpu=0 thread=ThreadId(0) action=delivered vector=40 source=Timer global_block_count=384 return_block=3 pending=0 IF=0 depth=1
+KMiri IRQ: event=1 cpu=0 action=timer-queued vector=40 source=Timer block=448 IF=false pending=1
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=512 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=576 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=640 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=704 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=768 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=832 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=896 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=960 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=1024 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=1088 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=1152 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=1216 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=1280 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=1344 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=1408 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=1472 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=1536 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=1600 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=1664 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=1728 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=1792 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=1856 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=1920 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=1984 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=2048 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=2112 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=2176 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=2240 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=2304 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=2368 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=2432 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=2496 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=2560 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=2624 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=2688 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=2752 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=2816 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=2880 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=2944 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=3008 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=3072 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=3136 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=3200 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=3264 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=3328 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=3392 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=3456 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=3520 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=3584 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=3648 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=3712 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=3776 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=3840 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=3904 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=3968 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=4032 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=4096 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=4160 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=4224 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=4288 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=4352 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=4416 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=4480 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=4544 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=4608 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=4672 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=4736 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=4800 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=4864 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=4928 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=4992 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=5056 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=5120 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=5184 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=5248 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=5312 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=5376 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=5440 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=5504 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=5568 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=5632 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=5696 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=5760 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=5824 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=5888 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=5952 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=6016 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=6080 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=6144 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=6208 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=6272 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=6336 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=6400 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=6464 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=6528 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=6592 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=6656 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=6720 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=6784 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=6848 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=6912 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=6976 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=7040 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=7104 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=7168 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=7232 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=7296 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=7360 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=7424 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=7488 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=7552 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=7616 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=7680 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=7744 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=7808 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=7872 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=7936 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=8000 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=8064 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=8128 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=8192 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=8256 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=8320 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=8384 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=8448 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=8512 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=8576 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=8640 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=8704 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=8768 pending=1 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Timer into_event=1 block_count=8832 pending=1 IF=false
+KMiri IRQ: event=0 cpu=0 thread=ThreadId(0) action=eoi vector=40 block_count=8851 IF=false
+KMiri IRQ: event=0 cpu=0 action=returned vector=40 source=Timer block_count=8853 IF=true depth=1
+KMiri IRQ: event=1 cpu=0 thread=ThreadId(0) action=delivered vector=40 source=Timer global_block_count=8853 return_block=3 pending=0 IF=0 depth=1
+KMiri IRQ: event=1 cpu=0 thread=ThreadId(0) action=eoi vector=40 block_count=8859 IF=false
+KMiri IRQ: event=1 cpu=0 action=returned vector=40 source=Timer block_count=8861 IF=true depth=1
+KMiri IRQ: event=2 cpu=0 action=timer-queued vector=40 source=Timer block=8896 IF=true pending=1
+KMiri IRQ: event=2 cpu=0 thread=ThreadId(0) action=delivered vector=40 source=Timer global_block_count=8896 return_block=8 pending=0 IF=0 depth=1
+KMiri IRQ: event=2 cpu=0 thread=ThreadId(0) action=eoi vector=40 block_count=8902 IF=false
+KMiri IRQ: event=2 cpu=0 action=returned vector=40 source=Timer block_count=8904 IF=true depth=1
+KMiri IRQ: event=3 cpu=0 action=timer-queued vector=40 source=Timer block=8960 IF=true pending=1
+KMiri IRQ: event=3 cpu=0 thread=ThreadId(0) action=delivered vector=40 source=Timer global_block_count=8960 return_block=14 pending=0 IF=0 depth=1
+KMiri IRQ: event=3 cpu=0 thread=ThreadId(0) action=eoi vector=40 block_count=8966 IF=false
+KMiri IRQ: event=3 cpu=0 action=returned vector=40 source=Timer block_count=8968 IF=true depth=1
+KMiri IRQ: event=4 cpu=0 action=timer-queued vector=40 source=Timer block=9024 IF=true pending=1
+KMiri IRQ: event=4 cpu=0 thread=ThreadId(0) action=delivered vector=40 source=Timer global_block_count=9024 return_block=0 pending=0 IF=0 depth=1
+KMiri IRQ: event=4 cpu=0 thread=ThreadId(0) action=eoi vector=40 block_count=9030 IF=false
+KMiri IRQ: event=4 cpu=0 action=returned vector=40 source=Timer block_count=9032 IF=true depth=1
+KMiri IRQ: event=5 cpu=0 action=timer-queued vector=40 source=Timer block=9088 IF=true pending=1
+KMiri IRQ: event=5 cpu=0 thread=ThreadId(0) action=delivered vector=40 source=Timer global_block_count=9088 return_block=44 pending=0 IF=0 depth=1
+KMiri IRQ: event=5 cpu=0 thread=ThreadId(0) action=eoi vector=40 block_count=9094 IF=false
+KMiri IRQ: event=5 cpu=0 action=returned vector=40 source=Timer block_count=9096 IF=true depth=1
+KMiri IRQ: event=6 cpu=0 action=timer-queued vector=40 source=Timer block=9152 IF=true pending=1
+KMiri IRQ: event=6 cpu=0 thread=ThreadId(0) action=delivered vector=40 source=Timer global_block_count=9152 return_block=13 pending=0 IF=0 depth=1
+KMiri IRQ: event=6 cpu=0 thread=ThreadId(0) action=eoi vector=40 block_count=9158 IF=false
+KMiri IRQ: event=6 cpu=0 action=returned vector=40 source=Timer block_count=9160 IF=true depth=1
+KMiri IRQ: event=7 cpu=0 action=timer-queued vector=40 source=Timer block=9216 IF=true pending=1
+KMiri IRQ: event=7 cpu=0 thread=ThreadId(0) action=delivered vector=40 source=Timer global_block_count=9216 return_block=0 pending=0 IF=0 depth=1
+KMiri IRQ: event=7 cpu=0 thread=ThreadId(0) action=eoi vector=40 block_count=9222 IF=false
+KMiri IRQ: event=7 cpu=0 action=returned vector=40 source=Timer block_count=9224 IF=true depth=1
+KMiri IRQ: event=8 cpu=0 action=timer-queued vector=40 source=Timer block=9280 IF=true pending=1
+KMiri IRQ: event=8 cpu=0 thread=ThreadId(0) action=delivered vector=40 source=Timer global_block_count=9280 return_block=1 pending=0 IF=0 depth=1
+KMiri IRQ: event=8 cpu=0 thread=ThreadId(0) action=eoi vector=40 block_count=9286 IF=false
+KMiri IRQ: event=8 cpu=0 action=returned vector=40 source=Timer block_count=9288 IF=true depth=1
+KMiri IRQ: event=9 cpu=0 action=timer-queued vector=40 source=Timer block=9344 IF=true pending=1
+KMiri IRQ: event=9 cpu=0 thread=ThreadId(0) action=delivered vector=40 source=Timer global_block_count=9344 return_block=0 pending=0 IF=0 depth=1
+KMiri IRQ: event=9 cpu=0 thread=ThreadId(0) action=eoi vector=40 block_count=9350 IF=false
+KMiri IRQ: event=9 cpu=0 action=returned vector=40 source=Timer block_count=9352 IF=true depth=1
+KMiri IRQ: event=10 cpu=0 action=timer-queued vector=40 source=Timer block=9408 IF=true pending=1
+KMiri IRQ: event=10 cpu=0 thread=ThreadId(0) action=delivered vector=40 source=Timer global_block_count=9408 return_block=0 pending=0 IF=0 depth=1
+KMiri IRQ: event=10 cpu=0 thread=ThreadId(0) action=eoi vector=40 block_count=9414 IF=false
+KMiri IRQ: event=10 cpu=0 action=returned vector=40 source=Timer block_count=9416 IF=true depth=1
+KMiri IRQ: event=11 cpu=0 action=timer-queued vector=40 source=Timer block=9472 IF=true pending=1
+KMiri IRQ: event=11 cpu=0 thread=ThreadId(0) action=delivered vector=40 source=Timer global_block_count=9472 return_block=3 pending=0 IF=0 depth=1
+KMiri IRQ: event=11 cpu=0 thread=ThreadId(0) action=eoi vector=40 block_count=9478 IF=false
+KMiri IRQ: event=11 cpu=0 action=returned vector=40 source=Timer block_count=9480 IF=true depth=1
+KMiri IRQ: event=12 cpu=0 action=timer-queued vector=40 source=Timer block=9536 IF=true pending=1
+KMiri IRQ: event=12 cpu=0 thread=ThreadId(0) action=delivered vector=40 source=Timer global_block_count=9536 return_block=19 pending=0 IF=0 depth=1
+KMiri IRQ: event=12 cpu=0 thread=ThreadId(0) action=eoi vector=40 block_count=9542 IF=false
+KMiri IRQ: event=12 cpu=0 action=returned vector=40 source=Timer block_count=9544 IF=true depth=1
+KMiri IRQ: event=13 cpu=0 action=timer-queued vector=40 source=Timer block=9600 IF=true pending=1
+KMiri IRQ: event=13 cpu=0 thread=ThreadId(0) action=delivered vector=40 source=Timer global_block_count=9600 return_block=0 pending=0 IF=0 depth=1
+KMiri IRQ: event=13 cpu=0 thread=ThreadId(0) action=eoi vector=40 block_count=9606 IF=false
+KMiri IRQ: event=13 cpu=0 action=returned vector=40 source=Timer block_count=9608 IF=true depth=1
+KMiri IRQ: event=14 cpu=0 action=timer-queued vector=40 source=Timer block=9664 IF=true pending=1
+KMiri IRQ: event=14 cpu=0 thread=ThreadId(0) action=delivered vector=40 source=Timer global_block_count=9664 return_block=0 pending=0 IF=0 depth=1
+KMiri IRQ: event=14 cpu=0 thread=ThreadId(0) action=eoi vector=40 block_count=9670 IF=false
+KMiri IRQ: event=14 cpu=0 action=returned vector=40 source=Timer block_count=9672 IF=true depth=1

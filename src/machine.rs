@@ -805,7 +805,7 @@ impl<'tcx> MiriMachine<'tcx> {
     }
 
     pub(crate) fn maybe_queue_timer_irq(&mut self, cpu: usize) -> Option<IrqQueueOutcome> {
-        if !self.irq_config.enabled() || !self.irq_cpus[cpu].active.is_empty() {
+        if !self.irq_config.enabled() {
             return None;
         }
 
