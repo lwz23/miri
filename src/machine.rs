@@ -142,6 +142,9 @@ pub struct FrameExtra<'tcx> {
     /// we stop unwinding, use the `CatchUnwindData` to handle catching.
     pub catch_unwind: Option<CatchUnwindData<'tcx>>,
 
+    /// Marks the IRQ entry itself, so helpers returning do not finish the interrupt.
+    pub irq: Option<IrqFrame>,
+
     /// If `measureme` profiling is enabled, holds timing information
     /// for the start of this frame. When we finish executing this frame,
     /// we use this to register a completed event with `measureme`.
@@ -159,11 +162,12 @@ pub struct FrameExtra<'tcx> {
 impl<'tcx> std::fmt::Debug for FrameExtra<'tcx> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Omitting `timing`, it does not support `Debug`.
-        let FrameExtra { borrow_tracker, catch_unwind, timing: _, user_relevance, data_race } =
+        let FrameExtra { borrow_tracker, catch_unwind, irq, timing: _, user_relevance, data_race } =
             self;
         f.debug_struct("FrameData")
             .field("borrow_tracker", borrow_tracker)
             .field("catch_unwind", catch_unwind)
+            .field("irq", irq)
             .field("user_relevance", user_relevance)
             .field("data_race", data_race)
             .finish()
@@ -172,7 +176,7 @@ impl<'tcx> std::fmt::Debug for FrameExtra<'tcx> {
 
 impl VisitProvenance for FrameExtra<'_> {
     fn visit_provenance(&self, visit: &mut VisitWith<'_>) {
-        let FrameExtra { catch_unwind, borrow_tracker, timing: _, user_relevance: _, data_race: _ } =
+        let FrameExtra { catch_unwind, borrow_tracker, irq: _, timing: _, user_relevance: _, data_race: _ } =
             self;
 
         catch_unwind.visit_provenance(visit);
@@ -506,12 +510,18 @@ pub(crate) struct PendingIrq {
     pub(crate) source: IrqSource,
 }
 
-pub(crate) struct ActiveIrq {
+/// Identity and return state owned by the IRQ entry frame.
+#[derive(Debug)]
+pub(crate) struct IrqFrame {
     pub(crate) event_id: u64,
+    pub(crate) cpu: usize,
     pub(crate) vector: u8,
     pub(crate) source: IrqSource,
-    pub(crate) stack_depth: usize,
-    pub(crate) was_enabled: bool,
+    pub(crate) saved_if: bool,
+}
+
+pub(crate) struct ActiveIrq {
+    pub(crate) event_id: u64,
     pub(crate) blocks: u64,
 }
 
@@ -783,20 +793,6 @@ impl<'tcx> MiriMachine<'tcx> {
         self.irq_entry?;
         let vector = self.timer_vector?;
         Some(self.queue_irq(cpu, vector, IrqSource::Timer))
-    }
-
-    pub(crate) fn finish_irq_if_returned(
-        &mut self,
-        cpu: usize,
-        current_stack_depth: usize,
-    ) -> Option<(u64, u8, IrqSource, bool)> {
-        let active = self.irq_cpus[cpu].active.as_ref()?;
-        if current_stack_depth > active.stack_depth {
-            return None;
-        }
-        let active = self.irq_cpus[cpu].active.take().unwrap();
-        self.irq_cpus[cpu].enabled = active.was_enabled;
-        Some((active.event_id, active.vector, active.source, active.was_enabled))
     }
 
     /// Create a new MiriMachine.
@@ -2083,6 +2079,7 @@ impl<'tcx> Machine<'tcx> for MiriMachine<'tcx> {
         let extra = FrameExtra {
             borrow_tracker: borrow_tracker.map(|bt| bt.borrow_mut().new_frame()),
             catch_unwind: None,
+            irq: None,
             timing,
             user_relevance: ecx.machine.user_relevance(&frame),
             data_race: ecx
@@ -2329,6 +2326,32 @@ impl<'tcx> Machine<'tcx> for MiriMachine<'tcx> {
         // Move `frame` into a sub-scope so we control when it will be dropped.
         let mut frame = frame;
         let timing = frame.extra.timing.take();
+        if let Some(irq) = frame.extra.irq.take() {
+            if unwinding {
+                throw_machine_stop!(TerminationInfo::Abort(format!(
+                    "panic unwound out of IRQ entry (event={}, vector={})",
+                    irq.event_id, irq.vector
+                )));
+            }
+            // The entry owns the CPU to restore, even if the current thread changes.
+            let cpu = &mut ecx.machine.irq_cpus[irq.cpu];
+            cpu.enabled = irq.saved_if;
+            if cpu.active.as_ref().map(|active| active.event_id) != Some(irq.event_id) {
+                bug!("IRQ entry frame does not match the active event");
+            }
+            cpu.active = None;
+            if ecx.machine.irq_config.trace() {
+                eprintln!(
+                    "KMiri IRQ: event={} cpu={} action=returned vector={} source={:?} block_count={} IF={}",
+                    irq.event_id,
+                    irq.cpu,
+                    irq.vector,
+                    irq.source,
+                    ecx.machine.basic_block_count,
+                    cpu.enabled
+                );
+            }
+        }
         let res = ecx.handle_stack_pop_unwind(frame.extra, unwinding);
         if let Some(profiler) = ecx.machine.profiler.as_ref() {
             profiler.finish_recording_interval_event(timing.unwrap());

@@ -42,3 +42,7 @@ pub fn register_entry(entry: extern "Rust" fn(u8)) {
 pub fn set_timer_vector(vector: u8) {
     unsafe { kern_miri_set_timer_vector(vector) };
 }
+
+pub fn is_enabled() -> bool {
+    unsafe { kern_miri_irq_is_enabled() }
+}
