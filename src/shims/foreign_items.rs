@@ -916,6 +916,36 @@ trait EvalContextExtPriv<'tcx>: crate::MiriInterpCxExt<'tcx> {
                     );
                 }
             }
+            "kern_miri_irq_eoi" => {
+                let [vector] =
+                    this.check_shim_sig_lenient(abi, CanonAbi::Rust, link_name, args)?;
+                let vector = this.read_scalar(vector)?.to_u8()?;
+                if vector < 32 {
+                    throw_machine_stop!(TerminationInfo::Abort(format!(
+                        "{link_name}: vector {vector} is reserved for CPU exceptions (valid range 32..=255)"
+                    )));
+                }
+                let cpu = this.machine.threads.active_cpu;
+                let Some(index) = this.machine.irq_cpus[cpu]
+                    .in_service
+                    .iter()
+                    .position(|irq| irq.vector == vector)
+                else {
+                    throw_machine_stop!(TerminationInfo::Abort(format!(
+                        "{link_name}: vector {vector} is not in service on cpu {cpu}"
+                    )));
+                };
+                let irq = this.machine.irq_cpus[cpu].in_service.remove(index);
+                if this.machine.irq_config.trace() {
+                    eprintln!(
+                        "KMiri IRQ: event={} cpu={cpu} thread={:?} action=eoi vector={vector} block_count={} IF={}",
+                        irq.event_id,
+                        this.machine.threads.active_thread(),
+                        this.machine.basic_block_count,
+                        this.machine.irq_cpus[cpu].enabled,
+                    );
+                }
+            }
             "kern_miri_set_timer_vector" | "kern_miri_test_raise_irq" => {
                 let [vector] =
                     this.check_shim_sig_lenient(abi, CanonAbi::Rust, link_name, args)?;

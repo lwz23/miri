@@ -12,6 +12,7 @@ static mut RUNS: usize = 0;
 extern "Rust" fn entry(vector: u8) {
     assert!(vector == TIMER_VECTOR || vector == TIMER_VECTOR + 1);
     unsafe { *core::ptr::addr_of_mut!(RUNS) += 1 };
+    irq::eoi(vector);
 }
 
 fn main() {

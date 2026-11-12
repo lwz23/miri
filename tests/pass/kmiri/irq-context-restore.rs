@@ -24,6 +24,7 @@ extern "Rust" fn entry(vector: u8) {
     assert!(!irq::is_enabled());
     recurse(50);
     unsafe { *core::ptr::addr_of_mut!(RUNS) += 1 };
+    irq::eoi(vector);
 }
 
 fn main() {
