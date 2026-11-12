@@ -51,3 +51,11 @@ pub fn is_enabled() -> bool {
 pub fn eoi(vector: u8) {
     unsafe { kern_miri_irq_eoi(vector) };
 }
+
+pub fn enable() {
+    unsafe { kern_miri_irq_enable() };
+}
+
+pub fn disable() {
+    unsafe { kern_miri_irq_disable() };
+}
