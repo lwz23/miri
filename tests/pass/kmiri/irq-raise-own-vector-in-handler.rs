@@ -1,5 +1,5 @@
 // An active vector is not pending: raising it inside its entry creates a new event.
-// The single-active gate prevents reentry until the first entry returns.
+// The in-service vector blocks its own class until EOI, preventing reentry then.
 // Expect delivered(0), queued(1), returned(0), delivered(1), returned(1), no merge.
 //@compile-flags: -Zkmiri-toml=dev/test_utils/irq.toml
 

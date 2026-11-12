@@ -1,4 +1,7 @@
-// A third vector is kept pending at the depth limit and delivered after unwinding one level.
+// Reaching the configured nesting depth with an acceptable pending IRQ is a diagnostic.
+// Each layer EOIs before raising the next vector, so the third entry is acceptable
+// and must Abort instead of being silently held pending.
+//@error-in-other-file: IRQ nesting limit reached
 //@compile-flags: -Zkmiri-toml=dev/test_utils/irq.toml
 #[path = "../../../dev/test_utils/irq.rs"]
 mod irq;

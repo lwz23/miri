@@ -17,6 +17,15 @@ use crate::mirch::PageState;
 use crate::shims::readiness::DelayedReadinessUpdates;
 use crate::*;
 
+/// Return the x86 LAPIC priority class of an interrupt vector.
+///
+/// Intel SDM Vol. 3, Section 11.8.3 defines the class as `vector >> 4`. KMiri
+/// fixes TPR at zero, so a pending vector is deliverable only when its class is
+/// strictly higher than every in-service class.
+fn irq_priority_class(vector: u8) -> u8 {
+    vector >> 4
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum SchedulingAction {
     /// Execute step on the active thread.
@@ -250,65 +259,70 @@ pub trait EvalContextExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
             && let Some(loc) = frame.current_loc().left()
         {
             let irq_cpu = &mut this.machine.irq_cpus[cpu];
-            let eligible = irq_cpu.pending.iter().position(|pending| {
-                !irq_cpu.in_service.iter().any(|service| service.vector == pending.vector)
-            });
-            if let Some(index) = eligible {
-                if (irq_cpu.active.len() as u64) >= this.machine.irq_config.max_nesting_depth()
-                {
+            // x86 LAPIC arbitration first selects the highest vector in the IRR.
+            // With TPR fixed at zero, PPR is the highest in-service priority class;
+            // only a strictly higher class may nest (Intel SDM Vol. 3, Sec. 11.8.3).
+            let index = irq_cpu
+                .pending
+                .iter()
+                .enumerate()
+                .max_by_key(|(_, pending)| pending.vector)
+                .map(|(index, _)| index)
+                .unwrap();
+            let vector = irq_cpu.pending[index].vector;
+            let highest_service_class =
+                irq_cpu.in_service.iter().map(|service| irq_priority_class(service.vector)).max();
+            let acceptable =
+                highest_service_class.is_none_or(|class| irq_priority_class(vector) > class);
+            if acceptable {
+                if (irq_cpu.active.len() as u64) >= this.machine.irq_config.max_nesting_depth() {
                     let pending = &irq_cpu.pending[index];
-                    if this.machine.irq_config.trace()
-                        && irq_cpu.last_cutoff_event != Some(pending.event_id)
-                    {
-                        eprintln!(
-                            "KMiri IRQ: event={} cpu={} action=cutoff vector={} depth={} max={} block_count={}",
-                            pending.event_id,
-                            cpu,
-                            pending.vector,
-                            irq_cpu.active.len(),
-                            this.machine.irq_config.max_nesting_depth(),
-                            this.machine.basic_block_count,
-                        );
-                        irq_cpu.last_cutoff_event = Some(pending.event_id);
-                    }
-                } else {
-                    let pending = irq_cpu.pending.remove(index).unwrap();
                     let event_id = pending.event_id;
-                    let vector = pending.vector;
-                    let source = pending.source;
-                    let entry = this.machine.irq_entry.unwrap();
-                    let return_block = loc.block;
-                    let depth = irq_cpu.active.len() + 1;
-                    irq_cpu.in_service.push(crate::machine::InServiceIrq { vector, event_id });
-                    irq_cpu.active.push(crate::machine::ActiveIrq { event_id, blocks: 0 });
-                    irq_cpu.enabled = false;
-                    if this.machine.irq_config.trace() {
-                        eprintln!(
-                            "KMiri IRQ: event={event_id} cpu={cpu} thread={:?} action=delivered vector={vector} source={source:?} global_block_count={} return_block={} pending={} IF=0 depth={depth}",
-                            this.machine.threads.active_thread(),
-                            this.machine.basic_block_count,
-                            return_block.index(),
-                            irq_cpu.pending.len(),
-                        );
-                    }
-                    this.call_function(
-                        entry,
-                        ExternAbi::Rust,
-                        &[ImmTy::from_uint(vector, this.machine.layouts.u8)],
-                        None,
-                        ReturnContinuation::Goto {
-                            ret: Some(return_block),
-                            unwind: mir::UnwindAction::Continue,
-                        },
-                    )?;
-                    this.frame_mut().extra.irq = Some(crate::machine::IrqFrame {
-                        event_id,
-                        cpu,
-                        vector,
-                        source,
-                        saved_if: true,
-                    });
+                    let in_service_vectors =
+                        irq_cpu.in_service.iter().map(|service| service.vector).collect::<Vec<_>>();
+                    let depth = irq_cpu.active.len();
+                    let max = this.machine.irq_config.max_nesting_depth();
+                    let global_block_count = this.machine.basic_block_count;
+                    throw_machine_stop!(TerminationInfo::Abort(format!(
+                        "IRQ nesting limit reached: event={event_id} vector={vector} depth={depth} max={max} in_service={in_service_vectors:?} global_block_count={global_block_count}"
+                    )));
                 }
+                let pending = irq_cpu.pending.remove(index).unwrap();
+                let event_id = pending.event_id;
+                let vector = pending.vector;
+                let source = pending.source;
+                let entry = this.machine.irq_entry.unwrap();
+                let return_block = loc.block;
+                let depth = irq_cpu.active.len() + 1;
+                irq_cpu.in_service.push(crate::machine::InServiceIrq { vector, event_id });
+                irq_cpu.active.push(crate::machine::ActiveIrq { event_id, blocks: 0 });
+                irq_cpu.enabled = false;
+                if this.machine.irq_config.trace() {
+                    eprintln!(
+                        "KMiri IRQ: event={event_id} cpu={cpu} thread={:?} action=delivered vector={vector} source={source:?} global_block_count={} return_block={} pending={} IF=0 depth={depth}",
+                        this.machine.threads.active_thread(),
+                        this.machine.basic_block_count,
+                        return_block.index(),
+                        irq_cpu.pending.len(),
+                    );
+                }
+                this.call_function(
+                    entry,
+                    ExternAbi::Rust,
+                    &[ImmTy::from_uint(vector, this.machine.layouts.u8)],
+                    None,
+                    ReturnContinuation::Goto {
+                        ret: Some(return_block),
+                        unwind: mir::UnwindAction::Continue,
+                    },
+                )?;
+                this.frame_mut().extra.irq = Some(crate::machine::IrqFrame {
+                    event_id,
+                    cpu,
+                    vector,
+                    source,
+                    saved_if: true,
+                });
             }
         }
 

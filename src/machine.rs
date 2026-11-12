@@ -542,18 +542,11 @@ pub(crate) struct CpuIrqState {
     pub(crate) pending: VecDeque<PendingIrq>,
     pub(crate) in_service: Vec<InServiceIrq>,
     pub(crate) active: Vec<ActiveIrq>,
-    pub(crate) last_cutoff_event: Option<u64>,
 }
 
 impl CpuIrqState {
     fn new() -> Self {
-        Self {
-            enabled: true,
-            pending: VecDeque::new(),
-            in_service: Vec::new(),
-            active: Vec::new(),
-            last_cutoff_event: None,
-        }
+        Self { enabled: true, pending: VecDeque::new(), in_service: Vec::new(), active: Vec::new() }
     }
 }
 
@@ -805,6 +798,10 @@ impl<'tcx> MiriMachine<'tcx> {
     }
 
     pub(crate) fn maybe_queue_timer_irq(&mut self, cpu: usize) -> Option<IrqQueueOutcome> {
+        // The virtual timer keeps ticking while an IRQ handler is active. Repeated
+        // ticks are latched and merged by `queue_irq`, as they would be in the IRR.
+        // `timer_vector` is the armed state: the guest sets it only after installing
+        // its timer callback, so no timer event is generated before that point.
         if !self.irq_config.enabled() {
             return None;
         }

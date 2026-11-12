@@ -1,0 +1,34 @@
+KMiri IRQ: cpu=0 action=entry-registered block_count=369
+KMiri IRQ: event=0 cpu=0 thread=ThreadId(0) action=queued vector=40 source=Test block_count=372 pending=1 IF=true
+KMiri IRQ: event=0 cpu=0 thread=ThreadId(0) action=delivered vector=40 source=Test global_block_count=372 return_block=1 pending=0 IF=0 depth=1
+KMiri IRQ: event=0 cpu=0 thread=ThreadId(0) action=eoi vector=40 block_count=378 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=enable block_count=382 pending=0
+KMiri IRQ: event=1 cpu=0 thread=ThreadId(0) action=queued vector=41 source=Test block_count=386 pending=1 IF=true
+KMiri IRQ: event=1 cpu=0 thread=ThreadId(0) action=delivered vector=41 source=Test global_block_count=386 return_block=1 pending=0 IF=0 depth=2
+KMiri IRQ: event=1 cpu=0 thread=ThreadId(0) action=eoi vector=41 block_count=392 IF=false
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=enable block_count=396 pending=0
+KMiri IRQ: event=2 cpu=0 thread=ThreadId(0) action=queued vector=42 source=Test block_count=400 pending=1 IF=true
+error: abnormal termination: IRQ nesting limit reached: event=2 vector=42 depth=2 max=2 in_service=[] global_block_count=400
+  --> tests/fail/kmiri/../../../dev/test_utils/irq.rs:LL:CC
+   |
+LL |     unsafe { kern_miri_test_raise_irq(vector) };
+   |                                             ^ abnormal termination occurred here
+   |
+   = note: stack backtrace:
+           0: irq::raise
+               at tests/fail/kmiri/../../../dev/test_utils/irq.rs:LL:CC
+           1: entry
+               at tests/fail/kmiri/irq-nesting-limit.rs:LL:CC
+           2: irq::raise
+               at tests/fail/kmiri/../../../dev/test_utils/irq.rs:LL:CC
+           3: entry
+               at tests/fail/kmiri/irq-nesting-limit.rs:LL:CC
+           4: irq::raise
+               at tests/fail/kmiri/../../../dev/test_utils/irq.rs:LL:CC
+           5: main
+               at tests/fail/kmiri/irq-nesting-limit.rs:LL:CC
+
+note: some details are omitted, run with `MIRIFLAGS=-Zmiri-backtrace=full` for a verbose backtrace
+
+error: aborting due to 1 previous error
+
