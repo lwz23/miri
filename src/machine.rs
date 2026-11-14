@@ -502,10 +502,15 @@ pub const CPU_NUM: usize = 2;
 /// stable so configured injections are reproducible.
 const ADVERSARIAL_IRQ_RNG_SEED_XOR: u64 = 0x4144564552534951;
 
+/// Derive the critical-point IRQ RNG from `random_seed` without consuming any
+/// values from the timer or adversarial RNGs.
+const CRITICAL_IRQ_RNG_SEED_XOR: u64 = 0x435249544943414c;
+
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum IrqSource {
     Timer,
     Adversarial,
+    Critical,
     Test,
 }
 
@@ -708,6 +713,7 @@ pub struct MiriMachine<'tcx> {
     pub(crate) irq_cpus: Vec<CpuIrqState>,
     pub(crate) irq_rng: StdRng,
     pub(crate) adversarial_irq_rng: StdRng,
+    pub(crate) critical_irq_rng: StdRng,
     pub(crate) next_irq_event_id: u64,
     pub(crate) irq_entry: Option<Instance<'tcx>>,
     pub(crate) timer_vector: Option<u8>,
@@ -861,6 +867,31 @@ impl<'tcx> MiriMachine<'tcx> {
         Some((vector, self.queue_irq(cpu, vector, IrqSource::Adversarial)))
     }
 
+    /// Maybe raise one configured device IRQ at an IF `false -> true` critical point.
+    ///
+    /// Models an interrupt arriving right when the guest enables local IRQs (`STI`).
+    /// No one-instruction STI shadow is modeled because KMiri checks IRQ delivery at
+    /// MIR terminator granularity, which is already coarser than one instruction.
+    /// The event only enters pending; the next terminator check decides acceptance.
+    pub(crate) fn maybe_queue_critical_irq(&mut self, cpu: usize) -> Option<(u8, IrqQueueOutcome)> {
+        if !self.irq_config.enabled() || !self.irq_config.critical_enabled() {
+            return None;
+        }
+        self.irq_entry?;
+
+        let probability = self.irq_config.critical_injection_rate();
+        if !self.critical_irq_rng.random_bool(probability) {
+            return None;
+        }
+
+        let vector = {
+            let vectors = self.irq_config.adversarial_vectors();
+            let index = self.critical_irq_rng.random_range(0..vectors.len());
+            vectors[index]
+        };
+        Some((vector, self.queue_irq(cpu, vector, IrqSource::Critical)))
+    }
+
     /// Create a new MiriMachine.
     ///
     /// Invariant: `genmc_ctx.is_some() == config.genmc_config.is_some()`
@@ -890,6 +921,8 @@ impl<'tcx> MiriMachine<'tcx> {
         let irq_rng = StdRng::seed_from_u64(irq_config.random_seed());
         let adversarial_irq_rng =
             StdRng::seed_from_u64(irq_config.random_seed() ^ ADVERSARIAL_IRQ_RNG_SEED_XOR);
+        let critical_irq_rng =
+            StdRng::seed_from_u64(irq_config.random_seed() ^ CRITICAL_IRQ_RNG_SEED_XOR);
         let rng = StdRng::seed_from_u64(config.seed.unwrap_or(0));
         let borrow_tracker = config.borrow_tracker.map(|bt| bt.instantiate_global_state(config));
         let data_race = if config.genmc_config.is_some() {
@@ -1002,6 +1035,7 @@ impl<'tcx> MiriMachine<'tcx> {
             irq_cpus: (0..CPU_NUM).map(|_| CpuIrqState::new()).collect(),
             irq_rng,
             adversarial_irq_rng,
+            critical_irq_rng,
             next_irq_event_id: 0,
             irq_entry: None,
             timer_vector: None,

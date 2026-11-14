@@ -884,6 +884,7 @@ trait EvalContextExtPriv<'tcx>: crate::MiriInterpCxExt<'tcx> {
                     ));
                 }
                 let cpu = this.machine.threads.active_cpu;
+                let was_enabled = this.machine.irq_cpus[cpu].enabled;
                 this.machine.irq_cpus[cpu].enabled = true;
                 if this.machine.irq_config.trace() {
                     eprintln!(
@@ -892,6 +893,27 @@ trait EvalContextExtPriv<'tcx>: crate::MiriInterpCxExt<'tcx> {
                         this.machine.basic_block_count,
                         this.machine.irq_cpus[cpu].pending.len(),
                     );
+                }
+                if !was_enabled {
+                    if let Some((vector, outcome)) = this.machine.maybe_queue_critical_irq(cpu) {
+                        if this.machine.irq_config.trace() {
+                            match outcome {
+                                crate::machine::IrqQueueOutcome::Queued { event_id } => eprintln!(
+                                    "KMiri IRQ: event={event_id} cpu={cpu} action=critical-queued vector={vector} source=Critical block={} IF={} pending={}",
+                                    this.machine.basic_block_count,
+                                    this.machine.irq_cpus[cpu].enabled,
+                                    this.machine.irq_cpus[cpu].pending.len(),
+                                ),
+                                crate::machine::IrqQueueOutcome::Merged { into_event } => eprintln!(
+                                    "KMiri IRQ: cpu={cpu} thread={:?} action=merged vector={vector} source=Critical into_event={into_event} block_count={} pending={} IF={}",
+                                    this.machine.threads.active_thread(),
+                                    this.machine.basic_block_count,
+                                    this.machine.irq_cpus[cpu].pending.len(),
+                                    this.machine.irq_cpus[cpu].enabled,
+                                ),
+                            }
+                        }
+                    }
                 }
             }
             "kern_miri_register_irq_entry" => {
