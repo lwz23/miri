@@ -9,6 +9,7 @@ unsafe extern "Rust" {
     fn kern_miri_register_irq_entry(entry: extern "Rust" fn(u8));
     fn kern_miri_set_timer_vector(vector: u8);
     fn kern_miri_test_raise_irq(vector: u8);
+    fn kern_miri_irq_eoi(vector: u8);
 }
 
 pub struct IrqGuard {
@@ -41,4 +42,12 @@ pub fn register_entry(entry: extern "Rust" fn(u8)) {
 
 pub fn set_timer_vector(vector: u8) {
     unsafe { kern_miri_set_timer_vector(vector) };
+}
+
+pub fn is_enabled() -> bool {
+    unsafe { kern_miri_irq_is_enabled() }
+}
+
+pub fn eoi(vector: u8) {
+    unsafe { kern_miri_irq_eoi(vector) };
 }

@@ -916,6 +916,36 @@ trait EvalContextExtPriv<'tcx>: crate::MiriInterpCxExt<'tcx> {
                     );
                 }
             }
+            "kern_miri_irq_eoi" => {
+                let [vector] =
+                    this.check_shim_sig_lenient(abi, CanonAbi::Rust, link_name, args)?;
+                let vector = this.read_scalar(vector)?.to_u8()?;
+                if vector < 32 {
+                    throw_machine_stop!(TerminationInfo::Abort(format!(
+                        "{link_name}: vector {vector} is reserved for CPU exceptions (valid range 32..=255)"
+                    )));
+                }
+                let cpu = this.machine.threads.active_cpu;
+                let Some(index) = this.machine.irq_cpus[cpu]
+                    .in_service
+                    .iter()
+                    .position(|irq| irq.vector == vector)
+                else {
+                    throw_machine_stop!(TerminationInfo::Abort(format!(
+                        "{link_name}: vector {vector} is not in service on cpu {cpu}"
+                    )));
+                };
+                let irq = this.machine.irq_cpus[cpu].in_service.remove(index);
+                if this.machine.irq_config.trace() {
+                    eprintln!(
+                        "KMiri IRQ: event={} cpu={cpu} thread={:?} action=eoi vector={vector} block_count={} IF={}",
+                        irq.event_id,
+                        this.machine.threads.active_thread(),
+                        this.machine.basic_block_count,
+                        this.machine.irq_cpus[cpu].enabled,
+                    );
+                }
+            }
             "kern_miri_set_timer_vector" | "kern_miri_test_raise_irq" => {
                 let [vector] =
                     this.check_shim_sig_lenient(abi, CanonAbi::Rust, link_name, args)?;
@@ -945,16 +975,25 @@ trait EvalContextExtPriv<'tcx>: crate::MiriInterpCxExt<'tcx> {
                             "{link_name}: vector {vector} raised before IRQ entry was registered"
                         )));
                     }
-                    let event_id =
+                    let outcome =
                         this.machine.queue_irq(cpu, vector, crate::machine::IrqSource::Test);
                     if this.machine.irq_config.trace() {
-                        eprintln!(
-                            "KMiri IRQ: event={event_id} cpu={cpu} thread={:?} action=queued vector={vector} source=Test block_count={} pending={} IF={}",
-                            this.machine.threads.active_thread(),
-                            this.machine.basic_block_count,
-                            this.machine.irq_cpus[cpu].pending.len(),
-                            this.machine.irq_cpus[cpu].enabled,
-                        );
+                        match outcome {
+                            crate::machine::IrqQueueOutcome::Queued { event_id } => eprintln!(
+                                "KMiri IRQ: event={event_id} cpu={cpu} thread={:?} action=queued vector={vector} source=Test block_count={} pending={} IF={}",
+                                this.machine.threads.active_thread(),
+                                this.machine.basic_block_count,
+                                this.machine.irq_cpus[cpu].pending.len(),
+                                this.machine.irq_cpus[cpu].enabled,
+                            ),
+                            crate::machine::IrqQueueOutcome::Merged { into_event } => eprintln!(
+                                "KMiri IRQ: cpu={cpu} thread={:?} action=merged vector={vector} source=Test into_event={into_event} block_count={} pending={} IF={}",
+                                this.machine.threads.active_thread(),
+                                this.machine.basic_block_count,
+                                this.machine.irq_cpus[cpu].pending.len(),
+                                this.machine.irq_cpus[cpu].enabled,
+                            ),
+                        }
                     }
                 }
             }

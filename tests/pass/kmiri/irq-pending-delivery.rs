@@ -48,6 +48,7 @@ extern "Rust" fn timer_irq_handler() {
 extern "Rust" fn entry(vector: u8) {
     assert_eq!(vector, TIMER_VECTOR);
     timer_irq_handler();
+    irq::eoi(vector);
 }
 
 fn main() {

@@ -1,0 +1,16 @@
+error: abnormal termination: kern_miri_irq_eoi: vector 40 is not in service on cpu 0
+  --> tests/fail/kmiri/../../../dev/test_utils/irq.rs:LL:CC
+   |
+LL |     unsafe { kern_miri_irq_eoi(vector) };
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^ abnormal termination occurred here
+   |
+   = note: stack backtrace:
+           0: irq::eoi
+               at tests/fail/kmiri/../../../dev/test_utils/irq.rs:LL:CC
+           1: main
+               at tests/fail/kmiri/irq-eoi-not-in-service.rs:LL:CC
+
+note: some details are omitted, run with `MIRIFLAGS=-Zmiri-backtrace=full` for a verbose backtrace
+
+error: aborting due to 1 previous error
+
