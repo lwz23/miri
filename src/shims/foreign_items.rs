@@ -945,16 +945,25 @@ trait EvalContextExtPriv<'tcx>: crate::MiriInterpCxExt<'tcx> {
                             "{link_name}: vector {vector} raised before IRQ entry was registered"
                         )));
                     }
-                    let event_id =
+                    let outcome =
                         this.machine.queue_irq(cpu, vector, crate::machine::IrqSource::Test);
                     if this.machine.irq_config.trace() {
-                        eprintln!(
-                            "KMiri IRQ: event={event_id} cpu={cpu} thread={:?} action=queued vector={vector} source=Test block_count={} pending={} IF={}",
-                            this.machine.threads.active_thread(),
-                            this.machine.basic_block_count,
-                            this.machine.irq_cpus[cpu].pending.len(),
-                            this.machine.irq_cpus[cpu].enabled,
-                        );
+                        match outcome {
+                            crate::machine::IrqQueueOutcome::Queued { event_id } => eprintln!(
+                                "KMiri IRQ: event={event_id} cpu={cpu} thread={:?} action=queued vector={vector} source=Test block_count={} pending={} IF={}",
+                                this.machine.threads.active_thread(),
+                                this.machine.basic_block_count,
+                                this.machine.irq_cpus[cpu].pending.len(),
+                                this.machine.irq_cpus[cpu].enabled,
+                            ),
+                            crate::machine::IrqQueueOutcome::Merged { into_event } => eprintln!(
+                                "KMiri IRQ: cpu={cpu} thread={:?} action=merged vector={vector} source=Test into_event={into_event} block_count={} pending={} IF={}",
+                                this.machine.threads.active_thread(),
+                                this.machine.basic_block_count,
+                                this.machine.irq_cpus[cpu].pending.len(),
+                                this.machine.irq_cpus[cpu].enabled,
+                            ),
+                        }
                     }
                 }
             }
