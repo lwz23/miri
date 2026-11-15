@@ -1,0 +1,13 @@
+KMiri IRQ: cpu=0 action=entry-registered block_count=369
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=disable block_count=404 pending=0
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=enable block_count=411 pending=0
+KMiri IRQ: event=0 cpu=0 action=critical-queued vector=64 source=Critical block=411 IF=true pending=1
+KMiri IRQ: event=0 cpu=0 thread=ThreadId(0) action=delivered vector=64 source=Critical global_block_count=411 return_block=1 pending=0 IF=0 depth=1
+KMiri IRQ: event=0 cpu=0 thread=ThreadId(0) action=eoi vector=64 block_count=415 IF=false
+KMiri IRQ: event=0 cpu=0 action=returned vector=64 source=Critical block_count=417 IF=true depth=1
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=disable block_count=451 pending=0
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=enable block_count=458 pending=0
+KMiri IRQ: event=1 cpu=0 action=critical-queued vector=64 source=Critical block=458 IF=true pending=1
+KMiri IRQ: event=1 cpu=0 thread=ThreadId(0) action=delivered vector=64 source=Critical global_block_count=458 return_block=1 pending=0 IF=0 depth=1
+KMiri IRQ: event=1 cpu=0 thread=ThreadId(0) action=eoi vector=64 block_count=462 IF=false
+KMiri IRQ: event=1 cpu=0 action=returned vector=64 source=Critical block_count=464 IF=true depth=1
