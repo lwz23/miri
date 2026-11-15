@@ -17,6 +17,7 @@ extern "Rust" fn entry(vector: u8) {
         (*core::ptr::addr_of_mut!(RECEIVED))[count] = vector;
         *core::ptr::addr_of_mut!(COUNT) = count + 1;
     }
+    irq::eoi(vector);
 }
 
 fn main() {

@@ -1,4 +1,5 @@
 KMiri IRQ: cpu=0 action=entry-registered block_count=369
 KMiri IRQ: event=0 cpu=0 thread=ThreadId(0) action=queued vector=40 source=Test block_count=372 pending=1 IF=true
 KMiri IRQ: event=0 cpu=0 thread=ThreadId(0) action=delivered vector=40 source=Test global_block_count=372 return_block=1 pending=0 IF=0
-KMiri IRQ: event=0 cpu=0 action=returned vector=40 source=Test block_count=1398 IF=true
+KMiri IRQ: event=0 cpu=0 thread=ThreadId(0) action=eoi vector=40 block_count=1399 IF=false
+KMiri IRQ: event=0 cpu=0 action=returned vector=40 source=Test block_count=1401 IF=true

@@ -19,6 +19,7 @@ extern "Rust" fn handler() {
 extern "Rust" fn entry(vector: u8) {
     assert_eq!(vector, TIMER_VECTOR);
     handler();
+    irq::eoi(vector);
 }
 
 fn main() {

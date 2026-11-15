@@ -19,6 +19,7 @@ extern "Rust" fn entry(vector: u8) {
         irq::raise(TIMER_VECTOR);
         assert_eq!(unsafe { *core::ptr::addr_of_mut!(RUNS) }, 1);
     }
+    irq::eoi(vector);
 }
 
 fn main() {

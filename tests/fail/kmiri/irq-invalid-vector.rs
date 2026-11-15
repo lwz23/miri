@@ -10,6 +10,7 @@ const TIMER_VECTOR: u8 = 40;
 
 extern "Rust" fn entry(vector: u8) {
     assert_eq!(vector, TIMER_VECTOR);
+    irq::eoi(vector);
 }
 
 fn main() {

@@ -256,6 +256,10 @@ pub trait EvalContextExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
             let source = pending.source;
             let entry = this.machine.irq_entry.unwrap();
             let return_block = loc.block;
+            debug_assert!(this.machine.irq_cpus[cpu].in_service.is_empty());
+            this.machine.irq_cpus[cpu]
+                .in_service
+                .push(crate::machine::InServiceIrq { vector, event_id });
             this.machine.irq_cpus[cpu].active = Some(crate::machine::ActiveIrq {
                 event_id,
                 blocks: 0,

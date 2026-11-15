@@ -531,15 +531,22 @@ pub(crate) struct ActiveIrq {
     pub(crate) blocks: u64,
 }
 
+/// An accepted IRQ that the controller is still waiting to acknowledge.
+pub(crate) struct InServiceIrq {
+    pub(crate) vector: u8,
+    pub(crate) event_id: u64,
+}
+
 pub(crate) struct CpuIrqState {
     pub(crate) enabled: bool,
     pub(crate) pending: VecDeque<PendingIrq>,
+    pub(crate) in_service: Vec<InServiceIrq>,
     pub(crate) active: Option<ActiveIrq>,
 }
 
 impl CpuIrqState {
     fn new() -> Self {
-        Self { enabled: true, pending: VecDeque::new(), active: None }
+        Self { enabled: true, pending: VecDeque::new(), in_service: Vec::new(), active: None }
     }
 }
 
@@ -2356,6 +2363,16 @@ impl<'tcx> Machine<'tcx> for MiriMachine<'tcx> {
             if unwinding {
                 throw_machine_stop!(TerminationInfo::Abort(format!(
                     "panic unwound out of IRQ entry (event={}, vector={})",
+                    irq.event_id, irq.vector
+                )));
+            }
+            if ecx.machine.irq_cpus[irq.cpu]
+                .in_service
+                .iter()
+                .any(|in_service| in_service.event_id == irq.event_id)
+            {
+                throw_machine_stop!(TerminationInfo::Abort(format!(
+                    "IRQ entry returned without EOI (event={}, vector={})",
                     irq.event_id, irq.vector
                 )));
             }
