@@ -497,9 +497,15 @@ impl<'tcx> PrimitiveLayouts<'tcx> {
 /// The number of CPUs that KernMiri emulates.
 pub const CPU_NUM: usize = 2;
 
+/// Derive the adversarial-device RNG from `random_seed` without consuming any
+/// values from the timer RNG. The exact constant is arbitrary, but must remain
+/// stable so configured injections are reproducible.
+const ADVERSARIAL_IRQ_RNG_SEED_XOR: u64 = 0x4144564552534951;
+
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum IrqSource {
     Timer,
+    Adversarial,
     Test,
 }
 
@@ -701,6 +707,7 @@ pub struct MiriMachine<'tcx> {
     pub(crate) irq_config: IrqConfigToml,
     pub(crate) irq_cpus: Vec<CpuIrqState>,
     pub(crate) irq_rng: StdRng,
+    pub(crate) adversarial_irq_rng: StdRng,
     pub(crate) next_irq_event_id: u64,
     pub(crate) irq_entry: Option<Instance<'tcx>>,
     pub(crate) timer_vector: Option<u8>,
@@ -821,6 +828,39 @@ impl<'tcx> MiriMachine<'tcx> {
         Some(self.queue_irq(cpu, vector, IrqSource::Timer))
     }
 
+    /// Maybe raise one configured adversarial device IRQ at this basic block.
+    ///
+    /// This source models the Asterinas threat that a peripheral may raise any
+    /// of its interrupts at any architecturally legal point. Legality is still
+    /// enforced later by IF, LAPIC priority arbitration, nesting depth, and the
+    /// pending/latching rules; this function only puts a vector into the IRR.
+    ///
+    /// KMiri deliberately does not track whether OSTD currently has an IrqLine
+    /// or callback for the vector. A released or otherwise unhandled line can
+    /// therefore be raised as a spurious device IRQ; OSTD's native dispatch
+    /// path handles that case, including the top-half EOI.
+    pub(crate) fn maybe_queue_adversarial_irq(
+        &mut self,
+        cpu: usize,
+    ) -> Option<(u8, IrqQueueOutcome)> {
+        if !self.irq_config.enabled() || !self.irq_config.adversarial_enabled() {
+            return None;
+        }
+        self.irq_entry?;
+
+        let probability = self.irq_config.adversarial_injection_rate();
+        if !self.adversarial_irq_rng.random_bool(probability) {
+            return None;
+        }
+
+        let vector = {
+            let vectors = self.irq_config.adversarial_vectors();
+            let index = self.adversarial_irq_rng.random_range(0..vectors.len());
+            vectors[index]
+        };
+        Some((vector, self.queue_irq(cpu, vector, IrqSource::Adversarial)))
+    }
+
     /// Create a new MiriMachine.
     ///
     /// Invariant: `genmc_ctx.is_some() == config.genmc_config.is_some()`
@@ -848,6 +888,8 @@ impl<'tcx> MiriMachine<'tcx> {
         let irq_config =
             config.kmiri_toml.as_ref().map(|toml| toml.irq().clone()).unwrap_or_default();
         let irq_rng = StdRng::seed_from_u64(irq_config.random_seed());
+        let adversarial_irq_rng =
+            StdRng::seed_from_u64(irq_config.random_seed() ^ ADVERSARIAL_IRQ_RNG_SEED_XOR);
         let rng = StdRng::seed_from_u64(config.seed.unwrap_or(0));
         let borrow_tracker = config.borrow_tracker.map(|bt| bt.instantiate_global_state(config));
         let data_race = if config.genmc_config.is_some() {
@@ -959,6 +1001,7 @@ impl<'tcx> MiriMachine<'tcx> {
             irq_config,
             irq_cpus: (0..CPU_NUM).map(|_| CpuIrqState::new()).collect(),
             irq_rng,
+            adversarial_irq_rng,
             next_irq_event_id: 0,
             irq_entry: None,
             timer_vector: None,
@@ -2158,8 +2201,9 @@ impl<'tcx> Machine<'tcx> for MiriMachine<'tcx> {
             ecx.machine.blocking_io.run_gc();
         }
 
-        // Timer IRQs are queued here, but scheduler.rs delivers them only after
-        // the current MIR terminator has completed.
+        // Timer and adversarial-device IRQs are queued here, but scheduler.rs
+        // delivers them only after the current MIR terminator has completed.
+        // Both independent sources may fire for the same basic block.
         if let Some(outcome) = ecx.machine.maybe_queue_timer_irq(ecx.machine.threads.active_cpu) {
             if ecx.machine.irq_config.trace() {
                 match outcome {
@@ -2180,6 +2224,34 @@ impl<'tcx> Machine<'tcx> for MiriMachine<'tcx> {
                         ecx.machine.irq_cpus[ecx.machine.threads.active_cpu].pending.len(),
                         ecx.machine.irq_cpus[ecx.machine.threads.active_cpu].enabled,
                     ),
+                }
+            }
+        }
+
+        if let Some((vector, outcome)) =
+            ecx.machine.maybe_queue_adversarial_irq(ecx.machine.threads.active_cpu)
+        {
+            if ecx.machine.irq_config.trace() {
+                match outcome {
+                    IrqQueueOutcome::Queued { event_id } =>
+                        eprintln!(
+                            "KMiri IRQ: event={event_id} cpu={} action=adversarial-queued vector={} source=Adversarial block={} IF={} pending={}",
+                            ecx.machine.threads.active_cpu,
+                            vector,
+                            ecx.machine.basic_block_count,
+                            ecx.machine.irq_cpus[ecx.machine.threads.active_cpu].enabled,
+                            ecx.machine.irq_cpus[ecx.machine.threads.active_cpu].pending.len(),
+                        ),
+                    IrqQueueOutcome::Merged { into_event } =>
+                        eprintln!(
+                            "KMiri IRQ: cpu={} thread={:?} action=merged vector={} source=Adversarial into_event={into_event} block_count={} pending={} IF={}",
+                            ecx.machine.threads.active_cpu,
+                            ecx.machine.threads.active_thread(),
+                            vector,
+                            ecx.machine.basic_block_count,
+                            ecx.machine.irq_cpus[ecx.machine.threads.active_cpu].pending.len(),
+                            ecx.machine.irq_cpus[ecx.machine.threads.active_cpu].enabled,
+                        ),
                 }
             }
         }
