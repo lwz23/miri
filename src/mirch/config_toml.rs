@@ -33,6 +33,11 @@ pub struct KMiriConfigToml {
     /// ```
     #[serde(default)]
     user_preferred_symbol: BTreeMap<String, bool>,
+    /// End and recreate Miri allocations for slab-backed slots at the Rust
+    /// global-allocator boundary. This is disabled by default to preserve
+    /// historic traces and allocator diagnostics.
+    #[serde(default)]
+    heap_slot_lifetime: bool,
     /// Configuration for KMiri's optional interrupt model.
     #[serde(default)]
     irq: IrqConfigToml,
@@ -127,6 +132,10 @@ impl KMiriConfigToml {
             ));
         }
         Ok(config)
+    }
+
+    pub fn heap_slot_lifetime(&self) -> bool {
+        self.heap_slot_lifetime
     }
 
     pub fn total_mem_size(&self) -> u64 {

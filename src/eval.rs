@@ -585,6 +585,10 @@ pub fn eval_entry<'tcx>(
     // indicate an error.
     let Err(res) = res.report_err();
 
+    if ecx.machine.heap_slot_lifetime {
+        ecx.machine.heap_slot_lifetime_stats.borrow().print();
+    }
+
     // Error reporting: if we survive all checks, we return the exit code the program gave us.
     'miri_error: {
         // Show diagnostic, if any.

@@ -3,10 +3,12 @@
 
 mod config;
 mod config_toml;
+pub(crate) mod heap_lifetime;
 mod page_table;
 mod physical_mem;
 
 pub use self::config::*;
 pub use self::config_toml::*;
+pub use self::heap_lifetime::*;
 pub use self::page_table::*;
 pub use self::physical_mem::*;

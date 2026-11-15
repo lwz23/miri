@@ -44,7 +44,9 @@ use crate::concurrency::{
 };
 use crate::debugger::reachability;
 use crate::helpers::{adjust_stack_addr, is_no_core};
-use crate::mirch::{self, IrqConfigToml, PageState, TypedKind};
+use crate::mirch::{
+    self, HeapSlotLifetimeStats, IrqConfigToml, PageState, TypedKind, heap_lifetime,
+};
 use crate::shims::readiness::DelayedReadinessUpdates;
 use crate::*;
 
@@ -145,6 +147,9 @@ pub struct FrameExtra<'tcx> {
     /// Marks the IRQ entry itself, so helpers returning do not finish the interrupt.
     pub(crate) irq: Option<IrqFrame>,
 
+    /// Marks an active `__rust_*` global-allocator boundary call for return handling.
+    pub(crate) heap_boundary: Option<heap_lifetime::AllocatorBoundaryMethod>,
+
     /// If `measureme` profiling is enabled, holds timing information
     /// for the start of this frame. When we finish executing this frame,
     /// we use this to register a completed event with `measureme`.
@@ -162,12 +167,21 @@ pub struct FrameExtra<'tcx> {
 impl<'tcx> std::fmt::Debug for FrameExtra<'tcx> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Omitting `timing`, it does not support `Debug`.
-        let FrameExtra { borrow_tracker, catch_unwind, irq, timing: _, user_relevance, data_race } =
+        let FrameExtra {
+            borrow_tracker,
+            catch_unwind,
+            irq,
+            heap_boundary,
+            timing: _,
+            user_relevance,
+            data_race,
+        } =
             self;
         f.debug_struct("FrameData")
             .field("borrow_tracker", borrow_tracker)
             .field("catch_unwind", catch_unwind)
             .field("irq", irq)
+            .field("heap_boundary", heap_boundary)
             .field("user_relevance", user_relevance)
             .field("data_race", data_race)
             .finish()
@@ -176,8 +190,15 @@ impl<'tcx> std::fmt::Debug for FrameExtra<'tcx> {
 
 impl VisitProvenance for FrameExtra<'_> {
     fn visit_provenance(&self, visit: &mut VisitWith<'_>) {
-        let FrameExtra { catch_unwind, borrow_tracker, irq: _, timing: _, user_relevance: _, data_race: _ } =
-            self;
+        let FrameExtra {
+            catch_unwind,
+            borrow_tracker,
+            irq: _,
+            heap_boundary: _,
+            timing: _,
+            user_relevance: _,
+            data_race: _,
+        } = self;
 
         catch_unwind.visit_provenance(visit);
         borrow_tracker.visit_provenance(visit);
@@ -697,6 +718,10 @@ pub struct MiriMachine<'tcx> {
     // The total number of blocks that have been executed.
     pub(crate) basic_block_count: u64,
 
+    /// Whether slab slot Miri allocations are replaced at the global allocator
+    /// boundary.
+    pub(crate) heap_slot_lifetime: bool,
+    pub(crate) heap_slot_lifetime_stats: RefCell<HeapSlotLifetimeStats>,
     /// KMiri's optional IRQ model, configured only through `-Zkmiri-toml`.
     pub(crate) irq_config: IrqConfigToml,
     pub(crate) irq_cpus: Vec<CpuIrqState>,
@@ -845,6 +870,8 @@ impl<'tcx> MiriMachine<'tcx> {
             let path = Path::new(out).join(filename);
             measureme::Profiler::new(path).expect("Couldn't create `measureme` profiler")
         });
+        let heap_slot_lifetime =
+            config.kmiri_toml.as_ref().is_some_and(|toml| toml.heap_slot_lifetime());
         let irq_config =
             config.kmiri_toml.as_ref().map(|toml| toml.irq().clone()).unwrap_or_default();
         let irq_rng = StdRng::seed_from_u64(irq_config.random_seed());
@@ -1005,6 +1032,8 @@ impl<'tcx> MiriMachine<'tcx> {
             pthread_rwlock_sanity: Cell::new(false),
             pthread_condvar_sanity: Cell::new(false),
             allocator_shim_symbols: Self::allocator_shim_symbols(tcx),
+            heap_slot_lifetime,
+            heap_slot_lifetime_stats: RefCell::new(HeapSlotLifetimeStats::default()),
             mangle_internal_symbol_cache: Default::default(),
             float_nondet: config.float_nondet,
             float_rounding_error: config.float_rounding_error,
@@ -2106,6 +2135,7 @@ impl<'tcx> Machine<'tcx> for MiriMachine<'tcx> {
             borrow_tracker: borrow_tracker.map(|bt| bt.borrow_mut().new_frame()),
             catch_unwind: None,
             irq: None,
+            heap_boundary: None,
             timing,
             user_relevance: ecx.machine.user_relevance(&frame),
             data_race: ecx
@@ -2163,23 +2193,25 @@ impl<'tcx> Machine<'tcx> for MiriMachine<'tcx> {
         if let Some(outcome) = ecx.machine.maybe_queue_timer_irq(ecx.machine.threads.active_cpu) {
             if ecx.machine.irq_config.trace() {
                 match outcome {
-                    IrqQueueOutcome::Queued { event_id } => eprintln!(
-                        "KMiri IRQ: event={event_id} cpu={} action=timer-queued vector={} source=Timer block={} IF={} pending={}",
-                        ecx.machine.threads.active_cpu,
-                        ecx.machine.timer_vector.unwrap(),
-                        ecx.machine.basic_block_count,
-                        ecx.machine.irq_cpus[ecx.machine.threads.active_cpu].enabled,
-                        ecx.machine.irq_cpus[ecx.machine.threads.active_cpu].pending.len(),
-                    ),
-                    IrqQueueOutcome::Merged { into_event } => eprintln!(
-                        "KMiri IRQ: cpu={} thread={:?} action=merged vector={} source=Timer into_event={into_event} block_count={} pending={} IF={}",
-                        ecx.machine.threads.active_cpu,
-                        ecx.machine.threads.active_thread(),
-                        ecx.machine.timer_vector.unwrap(),
-                        ecx.machine.basic_block_count,
-                        ecx.machine.irq_cpus[ecx.machine.threads.active_cpu].pending.len(),
-                        ecx.machine.irq_cpus[ecx.machine.threads.active_cpu].enabled,
-                    ),
+                    IrqQueueOutcome::Queued { event_id } =>
+                        eprintln!(
+                            "KMiri IRQ: event={event_id} cpu={} action=timer-queued vector={} source=Timer block={} IF={} pending={}",
+                            ecx.machine.threads.active_cpu,
+                            ecx.machine.timer_vector.unwrap(),
+                            ecx.machine.basic_block_count,
+                            ecx.machine.irq_cpus[ecx.machine.threads.active_cpu].enabled,
+                            ecx.machine.irq_cpus[ecx.machine.threads.active_cpu].pending.len(),
+                        ),
+                    IrqQueueOutcome::Merged { into_event } =>
+                        eprintln!(
+                            "KMiri IRQ: cpu={} thread={:?} action=merged vector={} source=Timer into_event={into_event} block_count={} pending={} IF={}",
+                            ecx.machine.threads.active_cpu,
+                            ecx.machine.threads.active_thread(),
+                            ecx.machine.timer_vector.unwrap(),
+                            ecx.machine.basic_block_count,
+                            ecx.machine.irq_cpus[ecx.machine.threads.active_cpu].pending.len(),
+                            ecx.machine.irq_cpus[ecx.machine.threads.active_cpu].enabled,
+                        ),
                 }
             }
         }
@@ -2358,6 +2390,15 @@ impl<'tcx> Machine<'tcx> for MiriMachine<'tcx> {
                     panic(None);
                 }
             }
+        }
+
+        // Complete a slab-backed global allocator boundary after the handler has
+        // written its return value and before control returns to the caller.
+        if !unwinding
+            && ecx.machine.heap_slot_lifetime
+            && let Some(method) = frame.extra.heap_boundary
+        {
+            heap_lifetime::after_allocator_boundary(ecx, method, frame.return_place())?;
         }
 
         // Move `frame` into a sub-scope so we control when it will be dropped.

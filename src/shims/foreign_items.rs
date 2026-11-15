@@ -23,7 +23,7 @@ use crate::concurrency::GenmcEvalContextExt as _;
 use crate::concurrency::thread::Stack;
 use crate::helpers::EvalContextExt as _;
 use crate::mirch::{
-    PageState, PageTable, TypedKind, dealloc_pages, insert_init_mask, type_pages_at,
+    PageState, PageTable, TypedKind, dealloc_pages, heap_lifetime, insert_init_mask, type_pages_at,
 };
 use crate::*;
 
@@ -64,6 +64,11 @@ pub trait EvalContextExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
                     let handler = this
                         .lookup_exported_symbol(other_fn)?
                         .expect("missing alloc error handler symbol");
+                    if heap_lifetime::try_invoke_allocator_boundary(
+                        this, link_name, handler.1, abi, args, dest, ret, unwind,
+                    )? {
+                        return interp_ok(None);
+                    }
                     return interp_ok(Some(handler));
                 }
                 Either::Right(special) => {
@@ -86,6 +91,19 @@ pub trait EvalContextExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
             .is_some_and(|c| c.prefers_user_implementation(link_name.as_str()))
         {
             if let Some(body) = this.lookup_exported_symbol(link_name)? {
+                let dest_place: PlaceTy<'tcx> = dest.clone().into();
+                if heap_lifetime::try_invoke_allocator_boundary(
+                    this,
+                    link_name,
+                    body.1,
+                    abi,
+                    args,
+                    &dest_place,
+                    ret,
+                    unwind,
+                )? {
+                    return interp_ok(None);
+                }
                 return interp_ok(Some(body));
             }
         }
@@ -94,6 +112,19 @@ pub trait EvalContextExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
         let res = this.emulate_foreign_item_inner(link_name, abi, args, &dest)?;
         res.jump_to_next_block(this, &dest, ret, Some(unwind), |this| {
             if let Some(body) = this.lookup_exported_symbol(link_name)? {
+                let dest_place: PlaceTy<'tcx> = dest.clone().into();
+                if heap_lifetime::try_invoke_allocator_boundary(
+                    this,
+                    link_name,
+                    body.1,
+                    abi,
+                    args,
+                    &dest_place,
+                    ret,
+                    unwind,
+                )? {
+                    return interp_ok(None);
+                }
                 return interp_ok(Some(body));
             }
 
@@ -895,8 +926,7 @@ trait EvalContextExtPriv<'tcx>: crate::MiriInterpCxExt<'tcx> {
                 }
             }
             "kern_miri_register_irq_entry" => {
-                let [entry] =
-                    this.check_shim_sig_lenient(abi, CanonAbi::Rust, link_name, args)?;
+                let [entry] = this.check_shim_sig_lenient(abi, CanonAbi::Rust, link_name, args)?;
                 if !this.machine.irq_config.enabled() {
                     throw_machine_stop!(TerminationInfo::Abort(format!(
                         "{link_name}: IRQ entry registered while KMiri IRQ simulation is disabled"
@@ -917,8 +947,7 @@ trait EvalContextExtPriv<'tcx>: crate::MiriInterpCxExt<'tcx> {
                 }
             }
             "kern_miri_irq_eoi" => {
-                let [vector] =
-                    this.check_shim_sig_lenient(abi, CanonAbi::Rust, link_name, args)?;
+                let [vector] = this.check_shim_sig_lenient(abi, CanonAbi::Rust, link_name, args)?;
                 let vector = this.read_scalar(vector)?.to_u8()?;
                 if vector < 32 {
                     throw_machine_stop!(TerminationInfo::Abort(format!(
@@ -947,8 +976,7 @@ trait EvalContextExtPriv<'tcx>: crate::MiriInterpCxExt<'tcx> {
                 }
             }
             "kern_miri_set_timer_vector" | "kern_miri_test_raise_irq" => {
-                let [vector] =
-                    this.check_shim_sig_lenient(abi, CanonAbi::Rust, link_name, args)?;
+                let [vector] = this.check_shim_sig_lenient(abi, CanonAbi::Rust, link_name, args)?;
                 let vector = this.read_scalar(vector)?.to_u8()?;
                 if !this.machine.irq_config.enabled() {
                     throw_machine_stop!(TerminationInfo::Abort(format!(
@@ -979,20 +1007,22 @@ trait EvalContextExtPriv<'tcx>: crate::MiriInterpCxExt<'tcx> {
                         this.machine.queue_irq(cpu, vector, crate::machine::IrqSource::Test);
                     if this.machine.irq_config.trace() {
                         match outcome {
-                            crate::machine::IrqQueueOutcome::Queued { event_id } => eprintln!(
-                                "KMiri IRQ: event={event_id} cpu={cpu} thread={:?} action=queued vector={vector} source=Test block_count={} pending={} IF={}",
-                                this.machine.threads.active_thread(),
-                                this.machine.basic_block_count,
-                                this.machine.irq_cpus[cpu].pending.len(),
-                                this.machine.irq_cpus[cpu].enabled,
-                            ),
-                            crate::machine::IrqQueueOutcome::Merged { into_event } => eprintln!(
-                                "KMiri IRQ: cpu={cpu} thread={:?} action=merged vector={vector} source=Test into_event={into_event} block_count={} pending={} IF={}",
-                                this.machine.threads.active_thread(),
-                                this.machine.basic_block_count,
-                                this.machine.irq_cpus[cpu].pending.len(),
-                                this.machine.irq_cpus[cpu].enabled,
-                            ),
+                            crate::machine::IrqQueueOutcome::Queued { event_id } =>
+                                eprintln!(
+                                    "KMiri IRQ: event={event_id} cpu={cpu} thread={:?} action=queued vector={vector} source=Test block_count={} pending={} IF={}",
+                                    this.machine.threads.active_thread(),
+                                    this.machine.basic_block_count,
+                                    this.machine.irq_cpus[cpu].pending.len(),
+                                    this.machine.irq_cpus[cpu].enabled,
+                                ),
+                            crate::machine::IrqQueueOutcome::Merged { into_event } =>
+                                eprintln!(
+                                    "KMiri IRQ: cpu={cpu} thread={:?} action=merged vector={vector} source=Test into_event={into_event} block_count={} pending={} IF={}",
+                                    this.machine.threads.active_thread(),
+                                    this.machine.basic_block_count,
+                                    this.machine.irq_cpus[cpu].pending.len(),
+                                    this.machine.irq_cpus[cpu].enabled,
+                                ),
                         }
                     }
                 }
