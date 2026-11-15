@@ -46,6 +46,9 @@ pub struct IrqConfigToml {
     tick_interval_basic_blocks: u64,
     inject_at_basic_blocks: Vec<u64>,
     random_injection_rate: f64,
+    adversarial_vectors: Vec<u8>,
+    adversarial_injection_rate: f64,
+    critical_injection_rate: f64,
     random_seed: u64,
     handler_budget_basic_blocks: u64,
     max_nesting_depth: u64,
@@ -59,6 +62,9 @@ impl Default for IrqConfigToml {
             tick_interval_basic_blocks: 0,
             inject_at_basic_blocks: Vec::new(),
             random_injection_rate: 0.0,
+            adversarial_vectors: Vec::new(),
+            adversarial_injection_rate: 0.0,
+            critical_injection_rate: 0.0,
             random_seed: 0,
             handler_budget_basic_blocks: 10_000,
             max_nesting_depth: 2,
@@ -82,6 +88,37 @@ impl IrqConfigToml {
 
     pub fn random_injection_rate(&self) -> f64 {
         self.random_injection_rate
+    }
+
+    /// Vectors that the adversarial device event source may raise.
+    ///
+    /// The list is intentionally independent of OSTD's IRQ-line allocator: a
+    /// real device may raise a line after its driver has released it, and the
+    /// native OSTD dispatcher safely handles an IRQ with no callback.
+    pub fn adversarial_vectors(&self) -> &[u8] {
+        &self.adversarial_vectors
+    }
+
+    pub fn adversarial_injection_rate(&self) -> f64 {
+        self.adversarial_injection_rate
+    }
+
+    /// The adversarial source is active only when both a vector list and a
+    /// non-zero probability are configured. When inactive, its RNG is never
+    /// drawn and therefore cannot perturb existing deterministic traces.
+    pub fn adversarial_enabled(&self) -> bool {
+        !self.adversarial_vectors.is_empty() && self.adversarial_injection_rate > 0.0
+    }
+
+    pub fn critical_injection_rate(&self) -> f64 {
+        self.critical_injection_rate
+    }
+
+    /// Critical-point injection is active only when both `adversarial_vectors`
+    /// is non-empty and `critical_injection_rate > 0.0`. When inactive, its RNG
+    /// is never drawn and cannot perturb existing traces.
+    pub fn critical_enabled(&self) -> bool {
+        !self.adversarial_vectors.is_empty() && self.critical_injection_rate > 0.0
     }
 
     pub fn random_seed(&self) -> u64 {
@@ -111,6 +148,38 @@ impl KMiriConfigToml {
         if !rate.is_finite() || !(0.0..=1.0).contains(&rate) {
             return Err(format!(
                 "invalid `[irq].random_injection_rate` in `{}`: expected a value in 0.0..=1.0",
+                path.display()
+            ));
+        }
+        let adversarial_rate = config.irq.adversarial_injection_rate;
+        if !adversarial_rate.is_finite() || !(0.0..=1.0).contains(&adversarial_rate) {
+            return Err(format!(
+                "invalid `[irq].adversarial_injection_rate` in `{}`: expected a value in 0.0..=1.0",
+                path.display()
+            ));
+        }
+        if let Some(vector) = config
+            .irq
+            .adversarial_vectors
+            .iter()
+            .copied()
+            .find(|vector| !(32..=255).contains(vector))
+        {
+            return Err(format!(
+                "invalid `[irq].adversarial_vectors` in `{}`: vector {vector} is outside the valid range 32..=255",
+                path.display()
+            ));
+        }
+        let critical_rate = config.irq.critical_injection_rate;
+        if !critical_rate.is_finite() || !(0.0..=1.0).contains(&critical_rate) {
+            return Err(format!(
+                "invalid `[irq].critical_injection_rate` in `{}`: expected a value in 0.0..=1.0",
+                path.display()
+            ));
+        }
+        if critical_rate > 0.0 && config.irq.adversarial_vectors.is_empty() {
+            return Err(format!(
+                "invalid `[irq].critical_injection_rate` in `{}`: positive rate requires non-empty `[irq].adversarial_vectors`",
                 path.display()
             ));
         }
@@ -209,6 +278,11 @@ fn irq_defaults_and_values() {
     assert!(!config.irq().enabled());
     assert_eq!(config.irq().handler_budget_basic_blocks(), 10_000);
     assert_eq!(config.irq().max_nesting_depth(), 2);
+    assert!(config.irq().adversarial_vectors().is_empty());
+    assert_eq!(config.irq().adversarial_injection_rate(), 0.0);
+    assert!(!config.irq().adversarial_enabled());
+    assert_eq!(config.irq().critical_injection_rate(), 0.0);
+    assert!(!config.irq().critical_enabled());
 
     let config: KMiriConfigToml = basic_toml::from_str(
         r#"
@@ -219,6 +293,9 @@ enabled = true
 tick_interval_basic_blocks = 8
 inject_at_basic_blocks = [12, 20]
 random_injection_rate = 0.25
+adversarial_vectors = [64, 65]
+adversarial_injection_rate = 0.00005
+critical_injection_rate = 0.1
 random_seed = 7
 handler_budget_basic_blocks = 64
 max_nesting_depth = 5
@@ -230,10 +307,60 @@ trace = true
     assert_eq!(config.irq().tick_interval_basic_blocks(), 8);
     assert_eq!(config.irq().inject_at_basic_blocks(), [12, 20]);
     assert_eq!(config.irq().random_injection_rate(), 0.25);
+    assert_eq!(config.irq().adversarial_vectors(), [64, 65]);
+    assert_eq!(config.irq().adversarial_injection_rate(), 0.00005);
+    assert!(config.irq().adversarial_enabled());
+    assert_eq!(config.irq().critical_injection_rate(), 0.1);
+    assert!(config.irq().critical_enabled());
     assert_eq!(config.irq().random_seed(), 7);
     assert_eq!(config.irq().handler_budget_basic_blocks(), 64);
     assert_eq!(config.irq().max_nesting_depth(), 5);
     assert!(config.irq().trace());
+}
+
+#[test]
+fn irq_rejects_invalid_adversarial_config() {
+    let cases = [
+        ("total_mem_size = 0x8000000\n[irq]\nadversarial_vectors = [31]\n", "adversarial_vectors"),
+        (
+            "total_mem_size = 0x8000000\n[irq]\nadversarial_injection_rate = 1.1\n",
+            "adversarial_injection_rate",
+        ),
+    ];
+    for (index, (source, expected)) in cases.iter().enumerate() {
+        let path = std::env::temp_dir()
+            .join(format!("kmiri-irq-adversarial-config-{}-{index}.toml", std::process::id()));
+        std::fs::write(&path, source).unwrap();
+        let err = KMiriConfigToml::new(&path).unwrap_err();
+        assert!(err.contains(expected), "unexpected error: {err}");
+        let _ = std::fs::remove_file(path);
+    }
+}
+
+#[test]
+fn irq_rejects_invalid_critical_config() {
+    let cases = [
+        (
+            "total_mem_size = 0x8000000\n[irq]\nadversarial_vectors = [64]\ncritical_injection_rate = 1.1\n",
+            "critical_injection_rate",
+        ),
+        (
+            "total_mem_size = 0x8000000\n[irq]\nadversarial_vectors = [64]\ncritical_injection_rate = -0.1\n",
+            "critical_injection_rate",
+        ),
+        (
+            "total_mem_size = 0x8000000\n[irq]\ncritical_injection_rate = 0.1\n",
+            "adversarial_vectors",
+        ),
+    ];
+    for (index, (source, expected)) in cases.iter().enumerate() {
+        let path = std::env::temp_dir()
+            .join(format!("kmiri-irq-critical-config-{}-{index}.toml", std::process::id()));
+        std::fs::write(&path, source).unwrap();
+        let err = KMiriConfigToml::new(&path).unwrap_err();
+        assert!(err.contains(expected), "unexpected error: {err}");
+        let _ = std::fs::remove_file(path);
+    }
 }
 
 #[test]

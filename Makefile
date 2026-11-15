@@ -68,6 +68,7 @@ endif
 ASTERINAS_TESTS := init frame-realloc page-table-realloc segment-zeroed \
                    task-switch-back task-exit-last task-exit-with-runnable \
                    irq-simulation irq-trap-path irq-nested-l2 bh-nesting-storm \
+                   irq-adversarial-line bh-nesting-short \
                    irq-deadlock irq-rcu-uaf
 .PHONY: asterinas-test-all
 asterinas-test-all: install install-osdk
