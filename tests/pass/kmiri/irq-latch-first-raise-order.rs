@@ -1,6 +1,6 @@
 // Latching a repeated vector must not move it behind a later distinct vector.
-// Masked raises 40, 41, 40 must deliver [40, 41], with the last raise merged
-// into event 0. No automatic timer is configured.
+// Masked raises 40, 41, 40 must deliver [41, 40]: LAPIC arbitration picks the
+// highest vector first, while the last raise merges into event 0.
 //@compile-flags: -Zkmiri-toml=dev/test_utils/irq.toml
 
 #[path = "../../../dev/test_utils/irq.rs"]
@@ -27,5 +27,5 @@ fn main() {
     irq::raise(TIMER_VECTOR);
     drop(guard);
     assert_eq!(unsafe { *core::ptr::addr_of_mut!(COUNT) }, 2);
-    assert_eq!(unsafe { *core::ptr::addr_of_mut!(RECEIVED) }, [TIMER_VECTOR, TIMER_VECTOR + 1]);
+    assert_eq!(unsafe { *core::ptr::addr_of_mut!(RECEIVED) }, [TIMER_VECTOR + 1, TIMER_VECTOR]);
 }

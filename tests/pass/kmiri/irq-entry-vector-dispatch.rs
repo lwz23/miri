@@ -1,6 +1,6 @@
-// Queue two distinct vectors while masked, then verify FIFO dispatch through one entry.
+// Queue two distinct vectors while masked, then verify highest-vector-first dispatch.
 // Explicit raises make the ordering deterministic; no automatic timer is configured.
-// Both vectors must arrive unchanged and in order after the guard is dropped.
+// LAPIC arbitration must deliver 41 before 40 through the one registered entry.
 //@compile-flags: -Zkmiri-toml=dev/test_utils/irq.toml
 
 #[path = "../../../dev/test_utils/irq.rs"]
@@ -28,5 +28,5 @@ fn main() {
         irq::raise(TIMER_VECTOR + 1);
     }
     assert_eq!(unsafe { *core::ptr::addr_of_mut!(COUNT) }, 2);
-    assert_eq!(unsafe { *core::ptr::addr_of_mut!(RECEIVED) }, [40, 41]);
+    assert_eq!(unsafe { *core::ptr::addr_of_mut!(RECEIVED) }, [41, 40]);
 }

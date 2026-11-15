@@ -48,6 +48,7 @@ pub struct IrqConfigToml {
     random_injection_rate: f64,
     random_seed: u64,
     handler_budget_basic_blocks: u64,
+    max_nesting_depth: u64,
     trace: bool,
 }
 
@@ -60,6 +61,7 @@ impl Default for IrqConfigToml {
             random_injection_rate: 0.0,
             random_seed: 0,
             handler_budget_basic_blocks: 10_000,
+            max_nesting_depth: 2,
             trace: false,
         }
     }
@@ -90,6 +92,10 @@ impl IrqConfigToml {
         self.handler_budget_basic_blocks
     }
 
+    pub fn max_nesting_depth(&self) -> u64 {
+        self.max_nesting_depth
+    }
+
     pub fn trace(&self) -> bool {
         self.trace
     }
@@ -111,6 +117,12 @@ impl KMiriConfigToml {
         if config.irq.enabled && config.irq.handler_budget_basic_blocks == 0 {
             return Err(format!(
                 "invalid `[irq].handler_budget_basic_blocks` in `{}`: expected a non-zero value when IRQ simulation is enabled",
+                path.display()
+            ));
+        }
+        if config.irq.enabled && config.irq.max_nesting_depth == 0 {
+            return Err(format!(
+                "invalid `[irq].max_nesting_depth` in `{}`: expected a non-zero value when IRQ simulation is enabled",
                 path.display()
             ));
         }
@@ -196,6 +208,7 @@ fn irq_defaults_and_values() {
     let config: KMiriConfigToml = basic_toml::from_str("total_mem_size = 0x8000000\n").unwrap();
     assert!(!config.irq().enabled());
     assert_eq!(config.irq().handler_budget_basic_blocks(), 10_000);
+    assert_eq!(config.irq().max_nesting_depth(), 2);
 
     let config: KMiriConfigToml = basic_toml::from_str(
         r#"
@@ -208,6 +221,7 @@ inject_at_basic_blocks = [12, 20]
 random_injection_rate = 0.25
 random_seed = 7
 handler_budget_basic_blocks = 64
+max_nesting_depth = 5
 trace = true
 "#,
     )
@@ -218,5 +232,19 @@ trace = true
     assert_eq!(config.irq().random_injection_rate(), 0.25);
     assert_eq!(config.irq().random_seed(), 7);
     assert_eq!(config.irq().handler_budget_basic_blocks(), 64);
+    assert_eq!(config.irq().max_nesting_depth(), 5);
     assert!(config.irq().trace());
+}
+
+#[test]
+fn irq_rejects_zero_max_nesting_depth() {
+    let path = std::env::temp_dir().join(format!("kmiri-irq-config-{}.toml", std::process::id()));
+    std::fs::write(
+        &path,
+        "total_mem_size = 0x8000000\n[irq]\nenabled = true\nmax_nesting_depth = 0\n",
+    )
+    .unwrap();
+    let err = KMiriConfigToml::new(&path).unwrap_err();
+    assert!(err.contains("max_nesting_depth"));
+    let _ = std::fs::remove_file(path);
 }

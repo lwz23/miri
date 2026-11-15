@@ -1,0 +1,11 @@
+KMiri IRQ: cpu=0 action=entry-registered block_count=369
+KMiri IRQ: event=0 cpu=0 thread=ThreadId(0) action=queued vector=40 source=Test block_count=372 pending=1 IF=true
+KMiri IRQ: event=0 cpu=0 thread=ThreadId(0) action=delivered vector=40 source=Test global_block_count=372 return_block=1 pending=0 IF=0 depth=1
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=enable block_count=379 pending=0
+KMiri IRQ: event=1 cpu=0 thread=ThreadId(0) action=queued vector=56 source=Test block_count=382 pending=1 IF=true
+KMiri IRQ: event=1 cpu=0 thread=ThreadId(0) action=delivered vector=56 source=Test global_block_count=382 return_block=1 pending=0 IF=0 depth=2
+KMiri IRQ: event=1 cpu=0 thread=ThreadId(0) action=eoi vector=56 block_count=390 IF=false
+KMiri IRQ: event=1 cpu=0 action=returned vector=56 source=Test block_count=396 IF=true depth=2
+KMiri IRQ: cpu=0 thread=ThreadId(0) action=disable block_count=404 pending=0
+KMiri IRQ: event=0 cpu=0 thread=ThreadId(0) action=eoi vector=40 block_count=408 IF=false
+KMiri IRQ: event=0 cpu=0 action=returned vector=40 source=Test block_count=414 IF=true depth=1
