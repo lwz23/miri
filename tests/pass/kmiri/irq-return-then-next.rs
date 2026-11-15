@@ -1,6 +1,7 @@
 // Two distinct masked vectors remain two pending events under vector latching.
-// After unmasking, each entry must return before the next is delivered.
-// The saved stderr checks delivered(0), returned(0), delivered(1), returned(1).
+// After unmasking, each entry must return before the next is delivered; the
+// higher vector (41) is delivered first.
+// The saved stderr checks delivered(1), returned(1), delivered(0), returned(0).
 //@compile-flags: -Zkmiri-toml=dev/test_utils/irq.toml
 
 #[path = "../../../dev/test_utils/irq.rs"]

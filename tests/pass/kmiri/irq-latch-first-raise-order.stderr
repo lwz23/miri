@@ -4,9 +4,9 @@ KMiri IRQ: event=0 cpu=0 thread=ThreadId(0) action=queued vector=40 source=Test 
 KMiri IRQ: event=1 cpu=0 thread=ThreadId(0) action=queued vector=41 source=Test block_count=380 pending=2 IF=false
 KMiri IRQ: cpu=0 thread=ThreadId(0) action=merged vector=40 source=Test into_event=0 block_count=383 pending=2 IF=false
 KMiri IRQ: cpu=0 thread=ThreadId(0) action=enable block_count=389 pending=2
-KMiri IRQ: event=0 cpu=0 thread=ThreadId(0) action=delivered vector=40 source=Test global_block_count=389 return_block=2 pending=1 IF=0 depth=1
-KMiri IRQ: event=0 cpu=0 thread=ThreadId(0) action=eoi vector=40 block_count=393 IF=false
-KMiri IRQ: event=0 cpu=0 action=returned vector=40 source=Test block_count=395 IF=true depth=1
-KMiri IRQ: event=1 cpu=0 thread=ThreadId(0) action=delivered vector=41 source=Test global_block_count=395 return_block=2 pending=0 IF=0 depth=1
-KMiri IRQ: event=1 cpu=0 thread=ThreadId(0) action=eoi vector=41 block_count=399 IF=false
-KMiri IRQ: event=1 cpu=0 action=returned vector=41 source=Test block_count=401 IF=true depth=1
+KMiri IRQ: event=1 cpu=0 thread=ThreadId(0) action=delivered vector=41 source=Test global_block_count=389 return_block=2 pending=1 IF=0 depth=1
+KMiri IRQ: event=1 cpu=0 thread=ThreadId(0) action=eoi vector=41 block_count=393 IF=false
+KMiri IRQ: event=1 cpu=0 action=returned vector=41 source=Test block_count=395 IF=true depth=1
+KMiri IRQ: event=0 cpu=0 thread=ThreadId(0) action=delivered vector=40 source=Test global_block_count=395 return_block=2 pending=0 IF=0 depth=1
+KMiri IRQ: event=0 cpu=0 thread=ThreadId(0) action=eoi vector=40 block_count=399 IF=false
+KMiri IRQ: event=0 cpu=0 action=returned vector=40 source=Test block_count=401 IF=true depth=1
