@@ -58,7 +58,7 @@ trait EvalContextPrivExt<'tcx>: MiriInterpCxExt<'tcx> {
         // A simulated IRQ runs synchronously on the interrupted thread and CPU.
         // Do not honor a pending preemption or CPU switch until its handler returns.
         let cpu = this.machine.threads.active_cpu;
-        if this.machine.irq_cpus[cpu].active.is_some() {
+        if !this.machine.irq_cpus[cpu].active.is_empty() {
             this.machine.threads.yield_active_thread = false;
             return interp_ok(SchedulingAction::ExecuteStep);
         }
@@ -206,7 +206,7 @@ pub trait EvalContextExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
         let blocks_executed = this.machine.basic_block_count - basic_blocks_before;
         if blocks_executed != 0 {
             let budget = this.machine.irq_config.handler_budget_basic_blocks();
-            let watchdog = this.machine.irq_cpus[cpu].active.as_mut().and_then(|active| {
+            let watchdog = this.machine.irq_cpus[cpu].active.last_mut().and_then(|active| {
                 active.blocks += blocks_executed;
                 (active.blocks > budget).then_some((active.event_id, active.blocks))
             });
@@ -244,53 +244,72 @@ pub trait EvalContextExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
         let top_frame = this.active_thread_stack().last();
         if blocks_executed != 0
             && this.machine.irq_config.enabled()
-            && this.machine.irq_cpus[cpu].active.is_none()
             && this.machine.irq_cpus[cpu].enabled
             && !this.machine.irq_cpus[cpu].pending.is_empty()
             && let Some(frame) = top_frame
             && let Some(loc) = frame.current_loc().left()
         {
-            let pending = this.machine.irq_cpus[cpu].pending.pop_front().unwrap();
-            let event_id = pending.event_id;
-            let vector = pending.vector;
-            let source = pending.source;
-            let entry = this.machine.irq_entry.unwrap();
-            let return_block = loc.block;
-            debug_assert!(this.machine.irq_cpus[cpu].in_service.is_empty());
-            this.machine.irq_cpus[cpu]
-                .in_service
-                .push(crate::machine::InServiceIrq { vector, event_id });
-            this.machine.irq_cpus[cpu].active = Some(crate::machine::ActiveIrq {
-                event_id,
-                blocks: 0,
+            let irq_cpu = &mut this.machine.irq_cpus[cpu];
+            let eligible = irq_cpu.pending.iter().position(|pending| {
+                !irq_cpu.in_service.iter().any(|service| service.vector == pending.vector)
             });
-            this.machine.irq_cpus[cpu].enabled = false;
-            if this.machine.irq_config.trace() {
-                eprintln!(
-                    "KMiri IRQ: event={event_id} cpu={cpu} thread={:?} action=delivered vector={vector} source={source:?} global_block_count={} return_block={} pending={} IF=0",
-                    this.machine.threads.active_thread(),
-                    this.machine.basic_block_count,
-                    return_block.index(),
-                    this.machine.irq_cpus[cpu].pending.len(),
-                );
+            if let Some(index) = eligible {
+                if (irq_cpu.active.len() as u64) >= this.machine.irq_config.max_nesting_depth()
+                {
+                    let pending = &irq_cpu.pending[index];
+                    if this.machine.irq_config.trace()
+                        && irq_cpu.last_cutoff_event != Some(pending.event_id)
+                    {
+                        eprintln!(
+                            "KMiri IRQ: event={} cpu={} action=cutoff vector={} depth={} max={} block_count={}",
+                            pending.event_id,
+                            cpu,
+                            pending.vector,
+                            irq_cpu.active.len(),
+                            this.machine.irq_config.max_nesting_depth(),
+                            this.machine.basic_block_count,
+                        );
+                        irq_cpu.last_cutoff_event = Some(pending.event_id);
+                    }
+                } else {
+                    let pending = irq_cpu.pending.remove(index).unwrap();
+                    let event_id = pending.event_id;
+                    let vector = pending.vector;
+                    let source = pending.source;
+                    let entry = this.machine.irq_entry.unwrap();
+                    let return_block = loc.block;
+                    let depth = irq_cpu.active.len() + 1;
+                    irq_cpu.in_service.push(crate::machine::InServiceIrq { vector, event_id });
+                    irq_cpu.active.push(crate::machine::ActiveIrq { event_id, blocks: 0 });
+                    irq_cpu.enabled = false;
+                    if this.machine.irq_config.trace() {
+                        eprintln!(
+                            "KMiri IRQ: event={event_id} cpu={cpu} thread={:?} action=delivered vector={vector} source={source:?} global_block_count={} return_block={} pending={} IF=0 depth={depth}",
+                            this.machine.threads.active_thread(),
+                            this.machine.basic_block_count,
+                            return_block.index(),
+                            irq_cpu.pending.len(),
+                        );
+                    }
+                    this.call_function(
+                        entry,
+                        ExternAbi::Rust,
+                        &[ImmTy::from_uint(vector, this.machine.layouts.u8)],
+                        None,
+                        ReturnContinuation::Goto {
+                            ret: Some(return_block),
+                            unwind: mir::UnwindAction::Continue,
+                        },
+                    )?;
+                    this.frame_mut().extra.irq = Some(crate::machine::IrqFrame {
+                        event_id,
+                        cpu,
+                        vector,
+                        source,
+                        saved_if: true,
+                    });
+                }
             }
-            this.call_function(
-                entry,
-                ExternAbi::Rust,
-                &[ImmTy::from_uint(vector, this.machine.layouts.u8)],
-                None,
-                ReturnContinuation::Goto {
-                    ret: Some(return_block),
-                    unwind: mir::UnwindAction::Continue,
-                },
-            )?;
-            this.frame_mut().extra.irq = Some(crate::machine::IrqFrame {
-                event_id,
-                cpu,
-                vector,
-                source,
-                saved_if: true,
-            });
         }
 
         interp_ok(())

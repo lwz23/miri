@@ -541,12 +541,19 @@ pub(crate) struct CpuIrqState {
     pub(crate) enabled: bool,
     pub(crate) pending: VecDeque<PendingIrq>,
     pub(crate) in_service: Vec<InServiceIrq>,
-    pub(crate) active: Option<ActiveIrq>,
+    pub(crate) active: Vec<ActiveIrq>,
+    pub(crate) last_cutoff_event: Option<u64>,
 }
 
 impl CpuIrqState {
     fn new() -> Self {
-        Self { enabled: true, pending: VecDeque::new(), in_service: Vec::new(), active: None }
+        Self {
+            enabled: true,
+            pending: VecDeque::new(),
+            in_service: Vec::new(),
+            active: Vec::new(),
+            last_cutoff_event: None,
+        }
     }
 }
 
@@ -798,7 +805,7 @@ impl<'tcx> MiriMachine<'tcx> {
     }
 
     pub(crate) fn maybe_queue_timer_irq(&mut self, cpu: usize) -> Option<IrqQueueOutcome> {
-        if !self.irq_config.enabled() || self.irq_cpus[cpu].active.is_some() {
+        if !self.irq_config.enabled() || !self.irq_cpus[cpu].active.is_empty() {
             return None;
         }
 
@@ -2379,19 +2386,22 @@ impl<'tcx> Machine<'tcx> for MiriMachine<'tcx> {
             // The entry owns the CPU to restore, even if the current thread changes.
             let cpu = &mut ecx.machine.irq_cpus[irq.cpu];
             cpu.enabled = irq.saved_if;
-            if cpu.active.as_ref().map(|active| active.event_id) != Some(irq.event_id) {
+            let active =
+                cpu.active.pop().unwrap_or_else(|| bug!("IRQ entry frame has no active event"));
+            if active.event_id != irq.event_id {
                 bug!("IRQ entry frame does not match the active event");
             }
-            cpu.active = None;
+            let depth = cpu.active.len() + 1;
             if ecx.machine.irq_config.trace() {
                 eprintln!(
-                    "KMiri IRQ: event={} cpu={} action=returned vector={} source={:?} block_count={} IF={}",
+                    "KMiri IRQ: event={} cpu={} action=returned vector={} source={:?} block_count={} IF={} depth={}",
                     irq.event_id,
                     irq.cpu,
                     irq.vector,
                     irq.source,
                     ecx.machine.basic_block_count,
-                    cpu.enabled
+                    cpu.enabled,
+                    depth
                 );
             }
         }
