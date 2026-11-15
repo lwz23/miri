@@ -208,14 +208,14 @@ pub trait EvalContextExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
             let budget = this.machine.irq_config.handler_budget_basic_blocks();
             let watchdog = this.machine.irq_cpus[cpu].active.as_mut().and_then(|active| {
                 active.blocks += blocks_executed;
-                (active.blocks > budget).then_some((
-                    active.event_id,
-                    active.stack_depth,
-                    active.blocks,
-                ))
+                (active.blocks > budget).then_some((active.event_id, active.blocks))
             });
-            if let Some((event_id, interrupted_depth, blocks)) = watchdog {
+            if let Some((event_id, blocks)) = watchdog {
                 let stack = this.active_thread_stack();
+                let interrupted_depth = stack
+                    .iter()
+                    .rposition(|frame| frame.extra.irq.is_some())
+                    .unwrap_or_else(|| bug!("active IRQ has no entry frame"));
                 let handler_stack = stack[interrupted_depth..]
                     .iter()
                     .rev()
@@ -238,19 +238,6 @@ pub trait EvalContextExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
             }
         }
 
-        let current_stack_depth = this.active_thread_stack().len();
-        if let Some((event_id, vector, source, was_enabled)) =
-            this.machine.finish_irq_if_returned(cpu, current_stack_depth)
-        {
-            if this.machine.irq_config.trace() {
-                eprintln!(
-                    "KMiri IRQ: event={event_id} cpu={cpu} action=returned vector={vector} source={source:?} block_count={} IF={}",
-                    this.machine.basic_block_count, this.machine.irq_cpus[cpu].enabled
-                );
-            }
-            debug_assert_eq!(this.machine.irq_cpus[cpu].enabled, was_enabled);
-        }
-
         // `before_terminator` queues timer events before the terminator executes.
         // Dispatch only after `step` completed, so the interrupted MIR frame is at
         // a stable block boundary and the handler returns to its successor block.
@@ -264,7 +251,6 @@ pub trait EvalContextExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
             && let Some(loc) = frame.current_loc().left()
         {
             let pending = this.machine.irq_cpus[cpu].pending.pop_front().unwrap();
-            let interrupted_depth = this.active_thread_stack().len();
             let event_id = pending.event_id;
             let vector = pending.vector;
             let source = pending.source;
@@ -272,10 +258,6 @@ pub trait EvalContextExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
             let return_block = loc.block;
             this.machine.irq_cpus[cpu].active = Some(crate::machine::ActiveIrq {
                 event_id,
-                vector,
-                source,
-                stack_depth: interrupted_depth,
-                was_enabled: true,
                 blocks: 0,
             });
             this.machine.irq_cpus[cpu].enabled = false;
@@ -298,6 +280,13 @@ pub trait EvalContextExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
                     unwind: mir::UnwindAction::Continue,
                 },
             )?;
+            this.frame_mut().extra.irq = Some(crate::machine::IrqFrame {
+                event_id,
+                cpu,
+                vector,
+                source,
+                saved_if: true,
+            });
         }
 
         interp_ok(())
