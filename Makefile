@@ -3,7 +3,11 @@ SYSROOT := $(shell rustc --print sysroot)
 MIRI_SYSROOT_REBUILT := /root/.cache/miri
 
 ASTERINAS_TOML := $(PROJ)/tests/asterinas.toml
-ASTERINAS_ENV_VARS := OSDK_LOCAL_DEV=1 MIRIFLAGS="-Zkmiri-toml=$(ASTERINAS_TOML) -Zmiri-permissive-provenance"
+# A test directory may carry its own kmiri.toml (e.g. to enable periodic timer
+# ticks); otherwise the shared ASTERINAS_TOML is used. Expanded after `cd` into
+# the test directory.
+ASTERINAS_TEST_TOML = $$(if [ -f kmiri.toml ]; then echo "$$PWD/kmiri.toml"; else echo "$(ASTERINAS_TOML)"; fi)
+ASTERINAS_ENV_VARS := OSDK_LOCAL_DEV=1 MIRIFLAGS="-Zkmiri-toml=$(ASTERINAS_TEST_TOML) -Zmiri-permissive-provenance"
 
 define RUN_IRQ_DEADLOCK_TEST
 log=$$(mktemp); \
@@ -63,7 +67,8 @@ endif
 
 ASTERINAS_TESTS := init frame-realloc page-table-realloc segment-zeroed \
                    task-switch-back task-exit-last task-exit-with-runnable \
-                   irq-simulation irq-trap-path irq-deadlock irq-rcu-uaf
+                   irq-simulation irq-trap-path irq-nested-l2 bh-nesting-storm \
+                   irq-deadlock irq-rcu-uaf
 .PHONY: asterinas-test-all
 asterinas-test-all: install install-osdk
 	set -eu; \
