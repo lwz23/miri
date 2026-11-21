@@ -16,6 +16,7 @@ unsafe extern "Rust" {
     pub fn kern_miri_write_bytes(paddr: usize, data: *const u8, len: usize);
     pub fn kern_miri_retype_pages(paddr: usize, count: usize, kind: TypedKind, slot_size: usize);
     pub fn kern_miri_copy_untyped(dst: usize, src: usize, len: usize);
+    pub fn kern_miri_copy(dst: usize, src: usize, len: usize);
     pub fn kern_miri_set_root_page_table(paddr: usize);
 }
 

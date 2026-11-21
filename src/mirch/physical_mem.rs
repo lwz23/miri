@@ -2,6 +2,7 @@ use std::alloc::Layout;
 use std::collections::{BTreeMap, BTreeSet};
 
 use rustc_abi::{Align, Size};
+use rustc_middle::mir::interpret::{CheckInAllocMsg, alloc_range};
 use rustc_middle::ty::Mutability;
 
 use super::PageTable;
@@ -338,6 +339,166 @@ pub fn physical_copy<'tcx>(
             );
         }
         target.init_mask_apply_copy(mask, (dst_offset..dst_offset + bytes.len()).into(), 1);
+    }
+    interp_ok(())
+}
+
+/// Translates a kernel virtual address to a physical one the way a memory
+/// access through a wildcard pointer does (see `alloc_id_from_addr`): through
+/// the page table when paging is enabled, then through the fixed kernel code and
+/// boot linear mappings.
+fn kernel_vaddr_to_paddr(page_table_enabled: bool, vaddr: usize) -> Option<usize> {
+    let linear = || {
+        super::try_kernel_code_vaddr_to_paddr(vaddr)
+            .or_else(|| super::try_boot_pt_vaddr_to_paddr(vaddr))
+    };
+    if page_table_enabled {
+        page_walk_or(vaddr, || vaddr).or_else(linear)
+    } else {
+        Some(linear().unwrap_or(vaddr))
+    }
+}
+
+/// Returns the physical address of the `len` bytes at `vaddr`, after checking
+/// that they lie on an untyped page and hold no interpreter allocation. `len`
+/// does not cross a page boundary.
+fn untyped_paddr<'tcx>(
+    this: &mut MiriInterpCx<'tcx>,
+    vaddr: usize,
+    len: usize,
+    write: bool,
+) -> InterpResult<'tcx, usize> {
+    let page_size = page_size();
+    let ptr = Pointer::new(Some(Provenance::Wildcard), Size::from_bytes(vaddr as u64));
+    if this.ptr_try_get_alloc_id(ptr, len as i64).is_ok() {
+        throw_unsup_format!(
+            "kernel copy range runs from untyped pages into the interpreter allocation at {vaddr:#x}"
+        );
+    }
+    let Some(paddr) = kernel_vaddr_to_paddr(this.machine.is_page_table_enabled(), vaddr) else {
+        // Natively the fallible copy would return the number of bytes it could
+        // not copy, and the infallible one would fault. Neither is modeled yet.
+        throw_unsup_format!("kernel copy touches the unmapped address {vaddr:#x}");
+    };
+    if paddr % page_size != vaddr % page_size {
+        throw_unsup_format!("kernel copy through a mapping that is not page-aligned at {vaddr:#x}");
+    }
+    if physical_mem().page_states.get(paddr / page_size) != Some(&PageState::Untyped) {
+        // Mapped memory that holds neither an allocation nor raw bytes, e.g. a
+        // freed slab slot: report the access like any other access there.
+        let size = Size::from_bytes(len as u64);
+        if write {
+            this.get_ptr_alloc_mut(ptr, size)?;
+        } else {
+            this.get_ptr_alloc(ptr, size)?;
+        }
+        throw_unsup_format!("kernel copy touches {vaddr:#x}, which is not an untyped page");
+    }
+    let Some(mask) = physical_mem().init_masks.get(&(paddr - paddr % page_size)) else {
+        throw_unsup_format!("kernel copy missing initialization shadow");
+    };
+    // Raw bytes cannot represent pointer provenance (as in `physical_copy`).
+    if mask.provenance().provenances().next().is_some() {
+        throw_unsup_format!("kernel copy cannot represent pointer provenance on untyped pages");
+    }
+    interp_ok(paddr)
+}
+
+/// Copies `len` bytes from virtual address `src` to virtual address `dst`, as
+/// the kernel's `memcpy` (natively `volatile_copy_memory`) does.
+///
+/// Each side of the copy is either one interpreter allocation (found the way
+/// any access through a pointer cast from an integer finds it, so this includes
+/// a large heap object or a task stack placed on untyped frames) or untyped
+/// pages (raw bytes with a per-byte initialization shadow, e.g. a page cache
+/// frame).
+///
+/// - A side that starts in an allocation must stay in it: going past its end is
+///   reported like any out-of-bounds access, whatever memory follows.
+/// - If both sides are allocations, this is the interpreter's own overlapping
+///   copy, which also carries pointer provenance.
+/// - Otherwise the copy goes in page-bounded chunks. Every chunk of the source
+///   is read before any is written, so overlapping ranges behave like
+///   `memmove`. Allocations are read and written with the usual checks
+///   (aliasing model, data races). Initialization state is copied byte by
+///   byte in both directions; pointer provenance is not, as raw bytes cannot
+///   hold it.
+/// - A side that starts on untyped pages and runs into an allocation is not
+///   supported.
+pub fn kernel_copy<'tcx>(
+    this: &mut MiriInterpCx<'tcx>,
+    dst: usize,
+    src: usize,
+    len: usize,
+) -> InterpResult<'tcx, ()> {
+    if len == 0 {
+        return interp_ok(());
+    }
+    if dst.checked_add(len).is_none() || src.checked_add(len).is_none() || len > total_mem_size()
+    {
+        throw_unsup_format!("kernel copy virtual range overflow or too large");
+    }
+    let wildcard =
+        |vaddr: usize| Pointer::new(Some(Provenance::Wildcard), Size::from_bytes(vaddr as u64));
+    let size = Size::from_bytes(len as u64);
+
+    let in_allocation = |this: &MiriInterpCx<'tcx>, vaddr: usize| -> InterpResult<'tcx, bool> {
+        if this.ptr_try_get_alloc_id(wildcard(vaddr), len as i64).is_err() {
+            return interp_ok(false);
+        }
+        this.check_ptr_access(wildcard(vaddr), size, CheckInAllocMsg::MemoryAccess)?;
+        interp_ok(true)
+    };
+    let src_in_allocation = in_allocation(this, src)?;
+    let dst_in_allocation = in_allocation(this, dst)?;
+    if src_in_allocation && dst_in_allocation {
+        return this.mem_copy(wildcard(src), wildcard(dst), size, false);
+    }
+
+    let page_size = page_size();
+    let mut snapshots = Vec::new();
+    let mut done = 0;
+    while done < len {
+        let (s, d) = (src + done, dst + done);
+        let n = (page_size - s % page_size).min(page_size - d % page_size).min(len - done);
+        let chunk = Size::from_bytes(n as u64);
+        let snapshot = if src_in_allocation {
+            this.get_ptr_alloc(wildcard(s), chunk)?;
+            let (alloc_id, offset, _) = this.ptr_get_alloc_id(wildcard(s), n as i64)?;
+            let alloc = this.get_alloc_raw(alloc_id)?;
+            let range = alloc_range(offset, chunk);
+            (alloc.get_bytes_unchecked(range).to_vec(), alloc.init_mask().prepare_copy(range))
+        } else {
+            let paddr = untyped_paddr(this, s, n, false)?;
+            let offset = paddr % page_size;
+            let mask = &physical_mem().init_masks[&(paddr - offset)];
+            let range = (offset..offset + n).into();
+            (mask.get_bytes_unchecked(range).to_vec(), mask.init_mask().prepare_copy(range))
+        };
+        snapshots.push((d, snapshot));
+        done += n;
+    }
+
+    for (d, (bytes, init)) in snapshots {
+        let n = bytes.len();
+        if dst_in_allocation {
+            this.write_bytes_ptr(wildcard(d), bytes)?;
+            let (alloc_id, offset, _) = this.ptr_get_alloc_id(wildcard(d), n as i64)?;
+            let (alloc, _) = this.get_alloc_raw_mut(alloc_id)?;
+            alloc.init_mask_apply_copy(init, alloc_range(offset, Size::from_bytes(n as u64)), 1);
+        } else {
+            let paddr = untyped_paddr(this, d, n, true)?;
+            let offset = paddr % page_size;
+            let mask = physical_mem_mut().init_masks.get_mut(&(paddr - offset)).unwrap();
+            unsafe {
+                core::ptr::copy_nonoverlapping(
+                    bytes.as_ptr(),
+                    mask.get_bytes_unchecked_raw_mut().add(offset),
+                    n,
+                );
+            }
+            mask.init_mask_apply_copy(init, (offset..offset + n).into(), 1);
+        }
     }
     interp_ok(())
 }

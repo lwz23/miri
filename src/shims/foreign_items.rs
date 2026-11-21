@@ -1241,6 +1241,14 @@ trait EvalContextExtPriv<'tcx>: crate::MiriInterpCxExt<'tcx> {
                 let len = this.read_target_usize(len)? as usize;
                 mirch::physical_copy(dst, src, len)?;
             }
+            "kern_miri_copy" => {
+                let [dst, src, len] =
+                    this.check_shim_sig_lenient(abi, CanonAbi::Rust, link_name, args)?;
+                let dst = this.read_target_usize(dst)? as usize;
+                let src = this.read_target_usize(src)? as usize;
+                let len = this.read_target_usize(len)? as usize;
+                mirch::kernel_copy(this, dst, src, len)?;
+            }
 
             // Rust for Linux symbols
             "rust_helper_krealloc_node_align" | "krealloc_node_align" => {
